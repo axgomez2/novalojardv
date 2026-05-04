@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\Artist;
 use App\Models\Category;
-use App\Models\ProductType;
 use App\Models\RecordLabel;
 use App\Models\Track;
 use App\Models\VinylMaster;
@@ -306,12 +305,6 @@ class VinylController extends Controller
                 ]);
             }
         }
-
-        // Ensure ProductType for vinyl exists
-        $productType = ProductType::firstOrCreate(
-            ['slug' => 'vinil'],
-            ['name' => 'Disco de Vinil', 'is_active' => true]
-        );
 
         AdminActivityLog::log(
             auth('admin')->user(),

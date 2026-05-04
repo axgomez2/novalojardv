@@ -18,6 +18,9 @@ class AdminMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         if (!Auth::guard('admin')->check()) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['error' => 'Unauthenticated'], 401);
+            }
             return redirect()->route('admin.login')
                 ->with('error', 'Você precisa estar logado para acessar esta área.');
         }
@@ -26,6 +29,9 @@ class AdminMiddleware
 
         if (!$user->isAdmin()) {
             Auth::guard('admin')->logout();
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
             return redirect()->route('admin.login')
                 ->with('error', 'Acesso negado. Você não tem permissão de administrador.');
         }

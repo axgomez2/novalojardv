@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Chart;
 use App\Models\Category;
-use App\Models\Track;
+use App\Models\VinylMaster;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -13,7 +13,7 @@ class ChartController extends Controller
 {
     public function index()
     {
-        $charts = Chart::with(['category', 'tracks'])
+        $charts = Chart::with(['category', 'vinyls'])
             ->orderBy('sort_order')
             ->orderBy('title')
             ->paginate(15);
@@ -46,20 +46,20 @@ class ChartController extends Controller
 
         $chart = Chart::create($validated);
 
-        return redirect()->route('admin.charts.edit', $chart)
-            ->with('success', 'Chart criado com sucesso! Agora adicione as faixas.');
+        return redirect()->route('admin.music.charts.edit', $chart)
+            ->with('success', 'Chart criado com sucesso! Agora adicione os discos.');
     }
 
     public function show(Chart $chart)
     {
-        $chart->load(['category', 'tracks.vinylMaster.artist']);
+        $chart->load(['category', 'vinyls.mainArtists']);
 
         return view('admin.charts.show', compact('chart'));
     }
 
     public function edit(Chart $chart)
     {
-        $chart->load(['tracks.vinylMaster.artist']);
+        $chart->load(['vinyls.mainArtists']);
         $categories = Category::orderBy('name')->get();
         $types = Chart::getTypes();
 
@@ -86,96 +86,101 @@ class ChartController extends Controller
 
         $chart->update($validated);
 
-        return redirect()->route('admin.charts.index')
+        return redirect()->route('admin.music.charts.index')
             ->with('success', 'Chart atualizado com sucesso!');
     }
 
     public function destroy(Chart $chart)
     {
-        $chart->tracks()->detach();
+        $chart->vinyls()->detach();
         $chart->delete();
 
-        return redirect()->route('admin.charts.index')
+        return redirect()->route('admin.music.charts.index')
             ->with('success', 'Chart excluído com sucesso!');
     }
 
-    public function searchTracks(Request $request)
+    public function searchVinyls(Request $request)
     {
         $query = $request->get('q', '');
 
-        $tracks = Track::with(['vinylMaster.artist'])
-            ->whereHas('vinylMaster', function ($q) use ($query) {
-                $q->where('title', 'like', "%{$query}%")
-                    ->orWhereHas('artist', function ($q2) use ($query) {
-                        $q2->where('name', 'like', "%{$query}%");
-                    });
-            })
-            ->orWhere('name', 'like', "%{$query}%")
-            ->limit(20)
-            ->get()
-            ->map(function ($track) {
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        try {
+            $vinyls = VinylMaster::with(['mainArtists'])
+                ->where('title', 'like', "%{$query}%")
+                ->orWhereHas('mainArtists', function ($q) use ($query) {
+                    $q->where('name', 'like', "%{$query}%");
+                })
+                ->limit(20)
+                ->get();
+
+            $result = $vinyls->map(function ($vinyl) {
                 return [
-                    'id' => $track->id,
-                    'name' => $track->name,
-                    'vinyl_title' => $track->vinylMaster?->title ?? 'N/A',
-                    'artist' => $track->vinylMaster?->artist?->name ?? 'N/A',
-                    'duration' => $track->duration,
+                    'id' => $vinyl->id,
+                    'title' => $vinyl->title,
+                    'artist' => $vinyl->artist_names ?? 'N/A',
+                    'cover_url' => $vinyl->cover_url,
                 ];
             });
 
-        return response()->json($tracks);
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
-    public function addTrack(Request $request, Chart $chart)
+    public function addVinyl(Request $request, Chart $chart)
     {
         $validated = $request->validate([
-            'track_id' => 'required|exists:tracks,id',
+            'vinyl_id' => 'required|exists:vinyl_masters,id',
         ]);
 
-        if ($chart->tracks()->count() >= $chart->max_tracks) {
-            return back()->with('error', "Este chart já atingiu o limite de {$chart->max_tracks} faixas.");
+        if ($chart->vinyls()->count() >= $chart->max_tracks) {
+            return back()->with('error', "Este chart já atingiu o limite de {$chart->max_tracks} discos.");
         }
 
-        if ($chart->tracks()->where('track_id', $validated['track_id'])->exists()) {
-            return back()->with('error', 'Esta faixa já está no chart.');
+        if ($chart->vinyls()->where('vinyl_master_id', $validated['vinyl_id'])->exists()) {
+            return back()->with('error', 'Este disco já está no chart.');
         }
 
-        $nextPosition = $chart->tracks()->max('position') + 1;
+        $nextPosition = $chart->vinyls()->max('chart_vinyls.position') + 1;
 
-        $chart->tracks()->attach($validated['track_id'], ['position' => $nextPosition]);
+        $chart->vinyls()->attach($validated['vinyl_id'], ['position' => $nextPosition]);
         $chart->update(['last_updated_at' => now()]);
 
-        return back()->with('success', 'Faixa adicionada ao chart!');
+        return back()->with('success', 'Disco adicionado ao chart!');
     }
 
-    public function removeTrack(Chart $chart, Track $track)
+    public function removeVinyl(Chart $chart, VinylMaster $vinyl)
     {
-        $chart->tracks()->detach($track->id);
+        $chart->vinyls()->detach($vinyl->id);
         $chart->update(['last_updated_at' => now()]);
 
-        $this->reorderTracks($chart);
+        $this->reorderVinyls($chart);
 
-        return back()->with('success', 'Faixa removida do chart!');
+        return back()->with('success', 'Disco removido do chart!');
     }
 
-    public function reorderTracks(Chart $chart)
+    private function reorderVinyls(Chart $chart): void
     {
         $position = 1;
-        foreach ($chart->tracks()->orderByPivot('position')->get() as $track) {
-            $chart->tracks()->updateExistingPivot($track->id, ['position' => $position]);
+        foreach ($chart->vinyls()->orderByPivot('position')->get() as $vinyl) {
+            $chart->vinyls()->updateExistingPivot($vinyl->id, ['position' => $position]);
             $position++;
         }
     }
 
-    public function updateTrackOrder(Request $request, Chart $chart)
+    public function updateVinylOrder(Request $request, Chart $chart)
     {
         $validated = $request->validate([
-            'tracks' => 'required|array',
-            'tracks.*' => 'exists:tracks,id',
+            'vinyls' => 'required|array',
+            'vinyls.*' => 'exists:vinyl_masters,id',
         ]);
 
-        foreach ($validated['tracks'] as $position => $trackId) {
-            $chart->tracks()->updateExistingPivot($trackId, ['position' => $position + 1]);
+        foreach ($validated['vinyls'] as $position => $vinylId) {
+            $chart->vinyls()->updateExistingPivot($vinylId, ['position' => $position + 1]);
         }
 
         $chart->update(['last_updated_at' => now()]);

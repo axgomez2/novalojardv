@@ -18,6 +18,17 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+!/storage/framework/cache/data/.gitkeep
+!/storage/framework/sessions/.gitkeep
+!/storage/framework/testing/.gitkeep
+!/storage/framework/views/.gitkeep
+!/storage/logs/.gitkeep
+/bootstrap/cache/*.php
 /vendor
 Homestead.json
 Homestead.yaml

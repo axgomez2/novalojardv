@@ -61,6 +61,14 @@ class Chart extends Model
             ->withTimestamps();
     }
 
+    public function vinyls(): BelongsToMany
+    {
+        return $this->belongsToMany(VinylMaster::class, 'chart_vinyls')
+            ->withPivot('position')
+            ->orderByPivot('position')
+            ->withTimestamps();
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -90,5 +98,18 @@ class Chart extends Model
             'new_releases' => 'Lançamentos',
             'custom' => 'Personalizado',
         ];
+    }
+
+    public function getCoverUrlAttribute(): ?string
+    {
+        if ($this->cover_image) {
+            return \Illuminate\Support\Facades\Storage::url($this->cover_image);
+        }
+        return null;
+    }
+
+    public function getPeriodAttribute(): ?string
+    {
+        return $this->attributes['period'] ?? $this->getTypeLabel();
     }
 }

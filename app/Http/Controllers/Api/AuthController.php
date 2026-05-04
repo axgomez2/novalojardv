@@ -406,6 +406,8 @@ class AuthController extends Controller
             'birth_date' => $user->birth_date?->format('Y-m-d'),
             'has_google' => !is_null($user->google_id),
             'email_verified' => $user->hasVerifiedEmail(),
+            'is_dj' => $user->is_dj,
+            'has_dj_playlist' => $user->is_dj && $user->djPlaylist !== null,
             'created_at' => $user->created_at->toISOString(),
         ];
     }

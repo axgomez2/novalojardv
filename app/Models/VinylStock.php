@@ -15,6 +15,7 @@ class VinylStock extends Model
 
     protected $fillable = [
         'vinyl_master_id',
+        'product_type_id',
         'catalog_number',
         'barcode',
         'internal_code',
@@ -62,6 +63,11 @@ class VinylStock extends Model
     public function vinylMaster(): BelongsTo
     {
         return $this->belongsTo(VinylMaster::class);
+    }
+
+    public function productType(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class);
     }
 
     public function mediaStatus(): BelongsTo
@@ -135,6 +141,15 @@ class VinylStock extends Model
     public function scopeAlbumsSection($query)
     {
         return $query->where('store_section', 'albums');
+    }
+
+    /**
+     * Filtra stocks por slug do ProductType.
+     * Ex.: VinylStock::ofProductType('discos-novos')->get()
+     */
+    public function scopeOfProductType($query, string $slug)
+    {
+        return $query->whereHas('productType', fn ($q) => $q->where('slug', $slug));
     }
 
     public function scopeOnPromotion($query)

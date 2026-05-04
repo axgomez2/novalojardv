@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\ChartController;
 use App\Http\Controllers\Admin\DjPlaylistController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\WeightController;
 use App\Http\Controllers\Admin\ShippingSettingsController;
 use App\Http\Controllers\Admin\SiteSettingsController;
@@ -181,15 +182,16 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
 
         // Playlists & Charts Module
         Route::prefix('music')->name('music.')->group(function () {
-            // Charts da Loja
+            // Charts da Loja (discos)
             Route::resource('charts', ChartController::class);
-            Route::get('charts-search-tracks', [ChartController::class, 'searchTracks'])->name('charts.search-tracks');
-            Route::post('charts/{chart}/tracks', [ChartController::class, 'addTrack'])->name('charts.add-track');
-            Route::delete('charts/{chart}/tracks/{track}', [ChartController::class, 'removeTrack'])->name('charts.remove-track');
-            Route::post('charts/{chart}/tracks/reorder', [ChartController::class, 'updateTrackOrder'])->name('charts.reorder-tracks');
+            Route::get('charts-search-vinyls', [ChartController::class, 'searchVinyls'])->name('charts.search-vinyls');
+            Route::post('charts/{chart}/vinyls', [ChartController::class, 'addVinyl'])->name('charts.add-vinyl');
+            Route::delete('charts/{chart}/vinyls/{vinyl}', [ChartController::class, 'removeVinyl'])->name('charts.remove-vinyl');
+            Route::post('charts/{chart}/vinyls/reorder', [ChartController::class, 'updateVinylOrder'])->name('charts.reorder-vinyls');
 
-            // Playlists de DJs
+            // Playlists de DJs (faixas)
             Route::resource('dj-playlists', DjPlaylistController::class);
+            Route::get('dj-playlists-search-tracks', [DjPlaylistController::class, 'searchTracks'])->name('dj-playlists.search-tracks');
             Route::post('dj-playlists/{dj_playlist}/tracks', [DjPlaylistController::class, 'addTrack'])->name('dj-playlists.add-track');
             Route::delete('dj-playlists/{dj_playlist}/tracks/{track}', [DjPlaylistController::class, 'removeTrack'])->name('dj-playlists.remove-track');
             Route::post('dj-playlists/{dj_playlist}/tracks/reorder', [DjPlaylistController::class, 'updateTrackOrder'])->name('dj-playlists.reorder-tracks');
@@ -210,6 +212,15 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::get('/', [SiteSettingsController::class, 'index'])->name('index');
             Route::put('/', [SiteSettingsController::class, 'update'])->name('update');
             Route::get('/remove-image/{key}', [SiteSettingsController::class, 'removeImage'])->name('remove-image');
+        });
+
+        // Clientes (ClientUsers)
+        Route::prefix('clients')->name('clients.')->group(function () {
+            Route::get('/', [ClientController::class, 'index'])->name('index');
+            Route::get('/{client}', [ClientController::class, 'show'])->name('show');
+            Route::patch('/{client}/toggle-dj', [ClientController::class, 'toggleDj'])->name('toggle-dj');
+            Route::patch('/{client}/toggle-active', [ClientController::class, 'toggleActive'])->name('toggle-active');
+            Route::get('/ajax/search-djs', [ClientController::class, 'searchDjs'])->name('search-djs');
         });
 
         // Pedidos (Orders)

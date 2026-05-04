@@ -28,7 +28,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Chart</th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Tipo</th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Categoria</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Faixas</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Discos</th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Atualizado</th>
                             <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Ações</th>
@@ -59,7 +59,7 @@
                                     {{ $chart->category?->name ?? '-' }}
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                    {{ $chart->tracks->count() }}/{{ $chart->max_tracks }}
+                                    {{ $chart->vinyls->count() }}/{{ $chart->max_tracks }}
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4">
                                     <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium {{ $chart->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">

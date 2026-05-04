@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClientUser;
 use App\Models\DjPlaylist;
 use App\Models\Track;
 use Illuminate\Http\Request;
@@ -23,12 +24,25 @@ class DjPlaylistController extends Controller
 
     public function create()
     {
-        return view('admin.dj-playlists.create');
+        // Pré-selecionar cliente se passado via query string
+        $selectedClient = null;
+        if (request('client_id')) {
+            $selectedClient = ClientUser::where('is_dj', true)->find(request('client_id'));
+        }
+
+        // Buscar DJs disponíveis (sem playlist vinculada)
+        $availableDjs = ClientUser::where('is_dj', true)
+            ->doesntHave('djPlaylist')
+            ->orderBy('name')
+            ->get();
+
+        return view('admin.dj-playlists.create', compact('availableDjs', 'selectedClient'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'client_user_id' => 'nullable|exists:client_users,id',
             'title' => 'required|string|max:255',
             'dj_name' => 'required|string|max:255',
             'dj_description' => 'nullable|string',
@@ -55,7 +69,7 @@ class DjPlaylistController extends Controller
 
         $playlist = DjPlaylist::create($validated);
 
-        return redirect()->route('admin.dj-playlists.edit', $playlist)
+        return redirect()->route('admin.music.dj-playlists.edit', $playlist)
             ->with('success', 'Playlist de DJ criada com sucesso! Agora adicione as faixas.');
     }
 
@@ -104,7 +118,7 @@ class DjPlaylistController extends Controller
 
         $djPlaylist->update($validated);
 
-        return redirect()->route('admin.dj-playlists.index')
+        return redirect()->route('admin.music.dj-playlists.index')
             ->with('success', 'Playlist de DJ atualizada com sucesso!');
     }
 
@@ -117,8 +131,45 @@ class DjPlaylistController extends Controller
         $djPlaylist->tracks()->detach();
         $djPlaylist->delete();
 
-        return redirect()->route('admin.dj-playlists.index')
+        return redirect()->route('admin.music.dj-playlists.index')
             ->with('success', 'Playlist de DJ excluída com sucesso!');
+    }
+
+    public function searchTracks(Request $request)
+    {
+        $query = $request->get('q', '');
+
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        try {
+            $tracks = Track::with(['vinylMaster.mainArtists'])
+                ->where('name', 'like', "%{$query}%")
+                ->orWhereHas('vinylMaster', function ($q) use ($query) {
+                    $q->where('title', 'like', "%{$query}%");
+                })
+                ->orWhereHas('vinylMaster.mainArtists', function ($q) use ($query) {
+                    $q->where('name', 'like', "%{$query}%");
+                })
+                ->limit(20)
+                ->get()
+                ->map(function ($track) {
+                    return [
+                        'id' => $track->id,
+                        'name' => $track->name,
+                        'position' => $track->position,
+                        'duration' => $track->duration,
+                        'vinyl_title' => $track->vinylMaster?->title ?? 'N/A',
+                        'artist' => $track->vinylMaster?->artist_names ?? 'N/A',
+                        'cover_url' => $track->vinylMaster?->cover_url,
+                    ];
+                });
+
+            return response()->json($tracks);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function addTrack(Request $request, DjPlaylist $djPlaylist)
@@ -135,7 +186,7 @@ class DjPlaylistController extends Controller
             return back()->with('error', 'Esta faixa já está na playlist.');
         }
 
-        $nextPosition = $djPlaylist->tracks()->max('position') + 1;
+        $nextPosition = $djPlaylist->tracks()->max('dj_playlist_tracks.position') + 1;
 
         $djPlaylist->tracks()->attach($validated['track_id'], ['position' => $nextPosition]);
         $djPlaylist->update(['last_updated_at' => now()]);

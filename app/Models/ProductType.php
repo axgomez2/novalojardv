@@ -38,6 +38,11 @@ class ProductType extends Model
         return $this->hasMany(Product::class);
     }
 
+    public function vinylStocks(): HasMany
+    {
+        return $this->hasMany(VinylStock::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
 
 class DjPlaylist extends Model
 {
     protected $fillable = [
+        'client_user_id',
         'title',
         'slug',
         'dj_name',
@@ -54,6 +56,11 @@ class DjPlaylist extends Model
             ->withPivot('position')
             ->orderByPivot('position')
             ->withTimestamps();
+    }
+
+    public function clientUser(): BelongsTo
+    {
+        return $this->belongsTo(ClientUser::class);
     }
 
     public function scopeActive($query)

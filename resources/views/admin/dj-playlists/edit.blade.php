@@ -224,16 +224,39 @@
             return {
                 query: '',
                 results: [],
+                loading: false,
                 async search() {
                     if (this.query.length < 2) {
                         this.results = [];
                         return;
                     }
+                    this.loading = true;
                     try {
-                        const response = await fetch(`{{ route('admin.music.charts.search-tracks') }}?q=${encodeURIComponent(this.query)}`);
-                        this.results = await response.json();
+                        const url = `{{ route('admin.music.dj-playlists.search-tracks') }}?q=${encodeURIComponent(this.query)}`;
+                        console.log('Fetching:', url);
+                        const response = await fetch(url, {
+                            method: 'GET',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        });
+                        console.log('Response status:', response.status);
+                        const data = await response.json();
+                        console.log('Data:', data);
+                        if (response.ok) {
+                            this.results = Array.isArray(data) ? data : [];
+                        } else {
+                            console.error('Search failed:', response.status, data);
+                            this.results = [];
+                        }
                     } catch (e) {
-                        console.error(e);
+                        console.error('Fetch error:', e);
+                        this.results = [];
+                    } finally {
+                        this.loading = false;
                     }
                 }
             }

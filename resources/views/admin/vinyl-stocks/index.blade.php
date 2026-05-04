@@ -70,6 +70,12 @@
                 <option value="dj" {{ request('store_section') == 'dj' ? 'selected' : '' }}>DJ</option>
                 <option value="albums" {{ request('store_section') == 'albums' ? 'selected' : '' }}>Álbum</option>
             </select>
+            <select name="product_type_id" class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="">Tipo de Produto</option>
+                @foreach($productTypes as $type)
+                    <option value="{{ $type->id }}" {{ request('product_type_id') == $type->id ? 'selected' : '' }}>{{ $type->name }}</option>
+                @endforeach
+            </select>
             <select name="supplier_id" class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 <option value="">Fornecedor</option>
                 @foreach($suppliers as $supplier)
@@ -81,7 +87,7 @@
                 <span class="text-sm text-gray-700">Estoque baixo</span>
             </label>
             <button type="submit" class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">Filtrar</button>
-            @if(request()->hasAny(['search', 'availability', 'is_new', 'store_section', 'supplier_id', 'low_stock']))
+            @if(request()->hasAny(['search', 'availability', 'is_new', 'store_section', 'product_type_id', 'supplier_id', 'low_stock']))
                 <a href="{{ route('admin.vinyl-stocks.index') }}" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Limpar</a>
             @endif
         </form>
@@ -135,6 +141,9 @@
                                 <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium {{ $stock->store_section == 'dj' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800' }}">
                                     {{ $stock->store_section == 'dj' ? 'DJ' : 'Álbum' }}
                                 </span>
+                                @if($stock->productType)
+                                    <p class="mt-1 text-xs text-gray-500">{{ $stock->productType->name }}</p>
+                                @endif
                             </td>
                             <td class="whitespace-nowrap px-6 py-4">
                                 <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium {{ $stock->is_new ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800' }}">

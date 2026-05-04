@@ -27,6 +27,7 @@ class ClientUser extends Authenticatable
         'email_verified_at',
         'role',
         'is_active',
+        'is_dj',
     ];
 
     protected $hidden = [
@@ -41,6 +42,7 @@ class ClientUser extends Authenticatable
             'birth_date' => 'date',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'is_dj' => 'boolean',
         ];
     }
 
@@ -59,6 +61,11 @@ class ClientUser extends Authenticatable
     public function isActive(): bool
     {
         return $this->is_active === true;
+    }
+
+    public function isDj(): bool
+    {
+        return $this->is_dj === true;
     }
 
     // Relationships
@@ -96,6 +103,11 @@ class ClientUser extends Authenticatable
     public function payments(): HasMany
     {
         return $this->hasMany(ClientPayment::class);
+    }
+
+    public function djPlaylist(): HasOne
+    {
+        return $this->hasOne(DjPlaylist::class);
     }
 
     // Accessors

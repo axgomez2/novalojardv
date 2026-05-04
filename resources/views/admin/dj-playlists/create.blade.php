@@ -15,6 +15,33 @@
             @csrf
 
             <div class="grid gap-6 md:grid-cols-2">
+                <!-- Vincular a um Cliente DJ -->
+                @if($availableDjs->count() > 0 || $selectedClient)
+                <div class="md:col-span-2 rounded-lg bg-purple-50 p-4 border border-purple-200">
+                    <h3 class="text-lg font-medium text-purple-900 mb-2">
+                        <svg class="inline h-5 w-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        Vincular a um Cliente DJ
+                    </h3>
+                    <p class="text-sm text-purple-700 mb-3">Vincule esta playlist a um cliente com permissão de DJ. O cliente poderá editar os discos da playlist pelo frontend.</p>
+                    
+                    <select name="client_user_id" id="client_user_id" 
+                            class="block w-full rounded-lg border-purple-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                            onchange="fillDjInfo(this)">
+                        <option value="">-- Não vincular (playlist independente) --</option>
+                        @foreach($availableDjs as $dj)
+                            <option value="{{ $dj->id }}" 
+                                    data-name="{{ $dj->name }}" 
+                                    data-email="{{ $dj->email }}"
+                                    {{ (old('client_user_id') == $dj->id || ($selectedClient && $selectedClient->id == $dj->id)) ? 'selected' : '' }}>
+                                {{ $dj->name }} ({{ $dj->email }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+
                 <!-- Informações da Playlist -->
                 <div class="md:col-span-2">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Informações da Playlist</h3>
@@ -32,7 +59,7 @@
 
                 <div>
                     <label for="dj_name" class="block text-sm font-medium text-gray-700">Nome do DJ *</label>
-                    <input type="text" name="dj_name" id="dj_name" value="{{ old('dj_name') }}" required
+                    <input type="text" name="dj_name" id="dj_name" value="{{ old('dj_name', $selectedClient?->name) }}" required
                            placeholder="Ex: DJ Alex"
                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     @error('dj_name')
@@ -149,4 +176,23 @@
             </div>
         </form>
     </div>
+
+    <script>
+        function fillDjInfo(select) {
+            const option = select.options[select.selectedIndex];
+            const djNameInput = document.getElementById('dj_name');
+            
+            if (option.value && option.dataset.name) {
+                djNameInput.value = option.dataset.name;
+            }
+        }
+
+        // Preencher ao carregar se já tiver selecionado
+        document.addEventListener('DOMContentLoaded', function() {
+            const select = document.getElementById('client_user_id');
+            if (select && select.value) {
+                fillDjInfo(select);
+            }
+        });
+    </script>
 </x-admin-layout>

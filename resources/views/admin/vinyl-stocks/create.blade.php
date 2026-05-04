@@ -133,6 +133,18 @@
                             </div>
                             <p class="mt-1 text-xs text-gray-500">Define em qual seção da loja o disco será exibido</p>
                         </div>
+                        <div class="sm:col-span-2">
+                            <label for="product_type_id" class="block text-sm font-medium text-gray-700">Tipo de Produto *</label>
+                            <select name="product_type_id" id="product_type_id" required
+                                    class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">Selecione o tipo de produto...</option>
+                                @foreach($productTypes as $type)
+                                    <option value="{{ $type->id }}" {{ old('product_type_id') == $type->id ? 'selected' : '' }}>{{ $type->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">Categoria principal usada pela API e pela vitrine da loja</p>
+                            @error('product_type_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
                         <div>
                             <label for="availability" class="block text-sm font-medium text-gray-700">Disponibilidade *</label>
                             <select name="availability" id="availability" required x-data x-on:change="$refs.releaseDate.classList.toggle('hidden', $event.target.value !== 'preorder')"

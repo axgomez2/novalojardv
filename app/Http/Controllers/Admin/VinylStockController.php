@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\CoverStatus;
 use App\Models\Dimension;
 use App\Models\MediaStatus;
+use App\Models\ProductType;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\VinylMaster;
@@ -25,7 +26,7 @@ class VinylStockController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = VinylStock::with(['vinylMaster.mainArtists', 'mediaStatus', 'coverStatus', 'supplier', 'categories']);
+        $query = VinylStock::with(['vinylMaster.mainArtists', 'mediaStatus', 'coverStatus', 'supplier', 'categories', 'productType']);
 
         // Filters
         if ($search = $request->get('search')) {
@@ -48,6 +49,10 @@ class VinylStockController extends Controller
             $query->where('store_section', $storeSection);
         }
 
+        if ($productTypeId = $request->get('product_type_id')) {
+            $query->where('product_type_id', $productTypeId);
+        }
+
         if ($request->get('low_stock')) {
             $query->lowStock();
         }
@@ -68,8 +73,9 @@ class VinylStockController extends Controller
         ];
 
         $suppliers = Supplier::active()->orderBy('name')->get();
+        $productTypes = ProductType::active()->orderBy('name')->get();
 
-        return view('admin.vinyl-stocks.index', compact('stocks', 'stats', 'suppliers'));
+        return view('admin.vinyl-stocks.index', compact('stocks', 'stats', 'suppliers', 'productTypes'));
     }
 
     /**
@@ -87,6 +93,7 @@ class VinylStockController extends Controller
         $dimensions = Dimension::active()->orderBy('name')->get();
         $suppliers = Supplier::active()->orderBy('name')->get();
         $categories = Category::with('children')->parents()->active()->orderBy('sort_order')->get();
+        $productTypes = ProductType::active()->orderBy('name')->get();
 
         // Generate next internal code
         $lastCode = VinylStock::withTrashed()
@@ -110,6 +117,7 @@ class VinylStockController extends Controller
             'dimensions',
             'suppliers',
             'categories',
+            'productTypes',
             'nextInternalCode'
         ));
     }
@@ -131,6 +139,7 @@ class VinylStockController extends Controller
             'edition' => 'nullable|string|max:100',
             'is_new' => 'boolean',
             'store_section' => 'required|in:dj,albums',
+            'product_type_id' => 'required|exists:product_types,id',
             'media_status_id' => 'nullable|exists:media_statuses,id',
             'cover_status_id' => 'nullable|exists:cover_statuses,id',
             'weight_id' => 'nullable|exists:weights,id',
@@ -234,6 +243,7 @@ class VinylStockController extends Controller
         $dimensions = Dimension::active()->orderBy('name')->get();
         $suppliers = Supplier::active()->orderBy('name')->get();
         $categories = Category::with('children')->parents()->active()->orderBy('sort_order')->get();
+        $productTypes = ProductType::active()->orderBy('name')->get();
 
         return view('admin.vinyl-stocks.edit', compact(
             'vinylStock',
@@ -242,7 +252,8 @@ class VinylStockController extends Controller
             'weights',
             'dimensions',
             'suppliers',
-            'categories'
+            'categories',
+            'productTypes'
         ));
     }
 
@@ -262,6 +273,7 @@ class VinylStockController extends Controller
             'edition' => 'nullable|string|max:100',
             'is_new' => 'boolean',
             'store_section' => 'required|in:dj,albums',
+            'product_type_id' => 'required|exists:product_types,id',
             'media_status_id' => 'nullable|exists:media_statuses,id',
             'cover_status_id' => 'nullable|exists:cover_statuses,id',
             'weight_id' => 'nullable|exists:weights,id',

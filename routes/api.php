@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Models\Vinyl;
+use App\Support\VinylApiFormatter;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -59,6 +60,132 @@ Route::prefix('auth')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| Rotas Protegidas - DJ Playlist
+|--------------------------------------------------------------------------
+*/
+Route::prefix('dj')->middleware('auth:sanctum')->group(function () {
+    Route::get('/my-playlist', [App\Http\Controllers\Api\DjPlaylistController::class, 'myPlaylist']);
+    Route::get('/search-tracks', [App\Http\Controllers\Api\DjPlaylistController::class, 'searchTracks']);
+    Route::post('/tracks', [App\Http\Controllers\Api\DjPlaylistController::class, 'addTrack']);
+    Route::delete('/tracks/{track}', [App\Http\Controllers\Api\DjPlaylistController::class, 'removeTrack']);
+    Route::post('/tracks/reorder', [App\Http\Controllers\Api\DjPlaylistController::class, 'reorderTracks']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Rotas Públicas - Charts
+|--------------------------------------------------------------------------
+*/
+Route::get('/charts', function () {
+    $charts = \App\Models\Chart::with(['vinyls.mainArtists'])
+        ->where('is_active', true)
+        ->orderBy('sort_order')
+        ->orderBy('created_at', 'desc')
+        ->get()
+        ->map(function ($chart) {
+            return [
+                'id' => $chart->id,
+                'title' => $chart->title,
+                'slug' => $chart->slug,
+                'period' => $chart->period,
+                'cover_image' => $chart->cover_url,
+                'vinyls_count' => $chart->vinyls->count(),
+            ];
+        });
+
+    return response()->json(['data' => $charts]);
+});
+
+Route::get('/charts/{slug}', function ($slug) {
+    $chart = \App\Models\Chart::with(['vinyls.mainArtists', 'vinyls.recordLabel'])
+        ->where('slug', $slug)
+        ->where('is_active', true)
+        ->firstOrFail();
+
+    return response()->json([
+        'data' => [
+            'id' => $chart->id,
+            'title' => $chart->title,
+            'slug' => $chart->slug,
+            'period' => $chart->period,
+            'description' => $chart->description,
+            'cover_image' => $chart->cover_url,
+            'vinyls' => $chart->vinyls->map(function ($vinyl) {
+                return [
+                    'id' => $vinyl->id,
+                    'position' => $vinyl->pivot->position,
+                    'title' => $vinyl->title,
+                    'artist' => $vinyl->artist_names,
+                    'cover_image' => $vinyl->cover_url,
+                    'slug' => $vinyl->slug,
+                    'catalog_number' => $vinyl->catalog_number,
+                ];
+            }),
+        ]
+    ]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Rotas Públicas - DJ Playlists
+|--------------------------------------------------------------------------
+*/
+Route::get('/dj-playlists', function () {
+    $playlists = \App\Models\DjPlaylist::with(['tracks'])
+        ->where('is_active', true)
+        ->orderBy('is_featured', 'desc')
+        ->orderBy('sort_order')
+        ->get()
+        ->map(function ($playlist) {
+            return [
+                'id' => $playlist->id,
+                'title' => $playlist->title,
+                'slug' => $playlist->slug,
+                'dj_name' => $playlist->dj_name,
+                'dj_image' => $playlist->dj_image_url,
+                'tracks_count' => $playlist->tracks->count(),
+                'is_featured' => $playlist->is_featured,
+            ];
+        });
+
+    return response()->json(['data' => $playlists]);
+});
+
+Route::get('/dj-playlists/{slug}', function ($slug) {
+    $playlist = \App\Models\DjPlaylist::with(['tracks.vinylMaster.mainArtists', 'tracks.vinylMaster.recordLabel'])
+        ->where('slug', $slug)
+        ->where('is_active', true)
+        ->firstOrFail();
+
+    return response()->json([
+        'data' => [
+            'id' => $playlist->id,
+            'title' => $playlist->title,
+            'slug' => $playlist->slug,
+            'dj_name' => $playlist->dj_name,
+            'dj_description' => $playlist->dj_description,
+            'dj_image' => $playlist->dj_image_url,
+            'social_links' => $playlist->getSocialLinks(),
+            'tracks' => $playlist->tracks->map(function ($track) {
+                return [
+                    'id' => $track->id,
+                    'position' => $track->pivot->position,
+                    'name' => $track->name,
+                    'vinyl' => [
+                        'id' => $track->vinylMaster?->id,
+                        'title' => $track->vinylMaster?->title,
+                        'artist' => $track->vinylMaster?->artist_names,
+                        'cover_image' => $track->vinylMaster?->cover_url,
+                        'slug' => $track->vinylMaster?->slug,
+                    ]
+                ];
+            }),
+        ]
+    ]);
+});
+
+/*
+|--------------------------------------------------------------------------
 | Rotas Públicas - Vinis
 |--------------------------------------------------------------------------
 */
@@ -84,7 +211,7 @@ Route::prefix('vinyls')->group(function () {
         
         $vinyls = $query->take(request('limit', 10))
             ->get()
-            ->map(fn($stock) => formatVinylForApi($stock));
+            ->map(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -100,7 +227,7 @@ Route::prefix('vinyls')->group(function () {
         
         $vinyls = $query->take(request('limit', 10))
             ->get()
-            ->map(fn($stock) => formatVinylForApi($stock));
+            ->map(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -117,7 +244,7 @@ Route::prefix('vinyls')->group(function () {
         
         $vinyls = $query->take(request('limit', 10))
             ->get()
-            ->map(fn($stock) => formatVinylForApi($stock));
+            ->map(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -134,7 +261,7 @@ Route::prefix('vinyls')->group(function () {
         
         $vinyls = $query->take(request('limit', 10))
             ->get()
-            ->map(fn($stock) => formatVinylForApi($stock));
+            ->map(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -149,7 +276,7 @@ Route::prefix('vinyls')->group(function () {
             ->orderBy('created_at', 'desc')
             ->take(request('limit', 10))
             ->get()
-            ->map(fn($stock) => formatVinylForApi($stock));
+            ->map(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -163,7 +290,7 @@ Route::prefix('vinyls')->group(function () {
             ->orderBy('created_at', 'desc')
             ->take(request('limit', 10))
             ->get()
-            ->map(fn($stock) => formatVinylForApi($stock));
+            ->map(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -179,7 +306,7 @@ Route::prefix('vinyls')->group(function () {
         
         $vinyls = $query->take(request('limit', 10))
             ->get()
-            ->map(fn($stock) => formatVinylForApi($stock));
+            ->map(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -196,7 +323,7 @@ Route::prefix('vinyls')->group(function () {
             'categories.parent'
         ])->findOrFail($id);
 
-        return response()->json(['data' => formatVinylForApi($stock, true)]);
+        return response()->json(['data' => VinylApiFormatter::detailed($stock)]);
     });
 
     // Discos relacionados (mesma seção e categoria pai)
@@ -232,7 +359,7 @@ Route::prefix('vinyls')->group(function () {
         $vinyls = $query->orderBy('created_at', 'desc')
             ->take(request('limit', 8))
             ->get()
-            ->map(fn($s) => formatVinylForApi($s));
+            ->map(fn($s) => VinylApiFormatter::format($s));
 
         return response()->json(['data' => $vinyls]);
     });
@@ -256,10 +383,70 @@ Route::prefix('vinyls')->group(function () {
         $vinyls = $query->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
             ->latest()
             ->paginate(request('per_page', 20))
-            ->through(fn($stock) => formatVinylForApi($stock));
+            ->through(fn($stock) => VinylApiFormatter::format($stock));
 
         return response()->json($vinyls);
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Rotas Públicas - Busca
+|--------------------------------------------------------------------------
+*/
+Route::get('/search', function () {
+    $query = request('q', '');
+    $section = request('section'); // dj ou albums
+    $perPage = request('per_page', 20);
+    
+    if (strlen($query) < 2) {
+        return response()->json([
+            'data' => [],
+            'meta' => ['total' => 0, 'query' => $query]
+        ]);
+    }
+    
+    $searchTerms = '%' . $query . '%';
+    
+    $results = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+        ->where('availability', '!=', 'unavailable')
+        ->where(function ($q) use ($searchTerms) {
+            // Busca no título do disco
+            $q->whereHas('vinylMaster', function ($subQ) use ($searchTerms) {
+                $subQ->where('title', 'like', $searchTerms)
+                     ->orWhere('catalog_number', 'like', $searchTerms);
+            })
+            // Busca no artista
+            ->orWhereHas('vinylMaster.mainArtists', function ($subQ) use ($searchTerms) {
+                $subQ->where('name', 'like', $searchTerms);
+            })
+            // Busca na gravadora
+            ->orWhereHas('vinylMaster.recordLabel', function ($subQ) use ($searchTerms) {
+                $subQ->where('name', 'like', $searchTerms);
+            })
+            // Busca nas faixas
+            ->orWhereHas('vinylMaster.tracks', function ($subQ) use ($searchTerms) {
+                $subQ->where('name', 'like', $searchTerms);
+            });
+        })
+        ->when($section, function ($q) use ($section) {
+            $q->where('store_section', $section);
+        })
+        ->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
+        ->orderBy('created_at', 'desc')
+        ->paginate($perPage)
+        ->through(fn($stock) => VinylApiFormatter::format($stock));
+    
+    return response()->json([
+        'data' => $results->items(),
+        'meta' => [
+            'total' => $results->total(),
+            'per_page' => $results->perPage(),
+            'current_page' => $results->currentPage(),
+            'last_page' => $results->lastPage(),
+            'query' => $query,
+        ]
+    ]);
 });
 
 /*
@@ -276,107 +463,21 @@ Route::post('/shipping/calculate', [App\Http\Controllers\Api\ShippingController:
 // Webhook do Mercado Pago (rota pública)
 Route::post('/webhooks/mercadopago', [App\Http\Controllers\Api\WebhookController::class, 'mercadoPago']);
 
-// Helper function para formatar vinil
-function formatVinylForApi(\App\Models\VinylStock $stock, bool $detailed = false): array
-{
-    $master = $stock->vinylMaster;
-    $isPreorder = $stock->availability === 'preorder';
-    $inStock = $stock->stock > 0;
-    
-    // Formatar tracks para o player híbrido
-    $tracks = $master?->tracks?->map(function($track) {
-        $audioUrl = null;
-        $audioSource = null;
-        
-        // Prioridade: audio local > youtube
-        if ($track->audio_path) {
-            $audioUrl = asset('storage/' . $track->audio_path);
-            $audioSource = 'local';
-        } elseif ($track->youtube_url) {
-            $audioUrl = $track->youtube_url;
-            $audioSource = 'youtube';
-        }
-        
-        return [
-            'id' => $track->id,
-            'position' => $track->position,
-            'name' => $track->name,
-            'duration' => $track->duration,
-            'duration_seconds' => $track->duration_seconds,
-            'audio_url' => $audioUrl,
-            'audio_source' => $audioSource,
-            'has_audio' => $audioUrl !== null,
-        ];
-    }) ?? collect();
-    
-    $data = [
-        'id' => $stock->id,
-        'title' => $master?->title ?? 'Sem Título',
-        'slug' => $master?->slug,
-        'artist' => $master?->artist_names ?? 'Artista Desconhecido',
-        'record_label' => $master?->recordLabel?->name,
-        'release_year' => $master?->release_year,
-        'cover_image' => $master?->cover_url ?? '/images/vinyl-placeholder.jpg',
-        'price' => $stock->current_price,
-        'formatted_price' => $stock->formatted_current_price,
-        'original_price' => $stock->is_promotional ? $stock->sell_price : null,
-        'formatted_original_price' => $stock->is_promotional ? $stock->formatted_sell_price : null,
-        'is_promotional' => $stock->isOnPromotion(),
-        'is_new' => $stock->is_new,
-        'is_preorder' => $isPreorder,
-        'release_date' => $stock->release_date?->format('Y-m-d'),
-        'formatted_release_date' => $stock->release_date?->format('d/m/Y'),
-        'condition' => $stock->condition_label,
-        'format' => $stock->format,
-        'stock' => $stock->stock,
-        'in_stock' => $inStock,
-        'availability' => $stock->availability,
-        'store_section' => $stock->store_section,
-        'can_buy' => $inStock || $isPreorder,
-        'show_wishlist' => $inStock && !$isPreorder,
-        'show_wantlist' => !$inStock || $isPreorder,
-        'tracks' => $tracks->values()->toArray(),
-        'tracks_count' => $tracks->count(),
-        'has_playable_tracks' => $tracks->where('has_audio', true)->count() > 0,
-    ];
+/*
+|--------------------------------------------------------------------------
+| Rotas Públicas - Product Types (endpoints isolados por tipo)
+|--------------------------------------------------------------------------
+| Cada tipo de produto tem uma rota dedicada para o frontend Vue consumir.
+| Aceitam ?per_page=20&page=1&in_stock=1
+*/
+Route::get('/product-types', [App\Http\Controllers\Api\ProductApiController::class, 'types']);
+Route::get('/product-types/{slug}/items', [App\Http\Controllers\Api\ProductApiController::class, 'itemsByType']);
 
-    if ($detailed) {
-        $data['description'] = $master?->description;
-        $data['genres'] = $master?->genres ?? [];
-        $data['styles'] = $master?->styles ?? [];
-        $data['country'] = $master?->country;
-        $data['catalog_number'] = $stock->catalog_number;
-        $data['barcode'] = $stock->barcode;
-        $data['color'] = $stock->color;
-        $data['edition'] = $stock->edition;
-        $data['num_discs'] = $stock->num_discs;
-        $data['speed'] = $stock->speed;
-        $data['media_status'] = $stock->mediaStatus?->name;
-        $data['cover_status'] = $stock->coverStatus?->name;
-        $data['notes'] = $stock->notes;
-        $data['vinyl_master_id'] = $master?->id;
-        $data['images'] = $master?->vinylImages?->map(fn($img) => [
-            'url' => $img->url,
-            'is_primary' => $img->is_primary,
-        ]) ?? [];
-        
-        // Buscar categorias do disco
-        $primaryCategory = $stock->categories()->wherePivot('is_primary', true)->first();
-        $data['category'] = $primaryCategory ? [
-            'id' => $primaryCategory->id,
-            'name' => $primaryCategory->name,
-            'slug' => $primaryCategory->slug,
-            'parent_id' => $primaryCategory->parent_id,
-            'parent' => $primaryCategory->parent ? [
-                'id' => $primaryCategory->parent->id,
-                'name' => $primaryCategory->parent->name,
-                'slug' => $primaryCategory->parent->slug,
-            ] : null,
-        ] : null;
-    }
-
-    return $data;
-}
+Route::get('/discos-novos', [App\Http\Controllers\Api\ProductApiController::class, 'discosNovos']);
+Route::get('/discos-usados', [App\Http\Controllers\Api\ProductApiController::class, 'discosUsados']);
+Route::get('/discos-nacionais', [App\Http\Controllers\Api\ProductApiController::class, 'discosNacionais']);
+Route::get('/equipamentos', [App\Http\Controllers\Api\ProductApiController::class, 'equipamentos']);
+Route::get('/acessorios', [App\Http\Controllers\Api\ProductApiController::class, 'acessorios']);
 
 /*
 |--------------------------------------------------------------------------
