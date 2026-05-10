@@ -411,8 +411,7 @@
                         <div>
                             <label for="format" class="block text-sm font-medium text-gray-700">Formato</label>
                             <select name="format" id="format" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">Selecione...</option>
-                                <option value="LP" {{ old('format') == 'LP' ? 'selected' : '' }}>LP (12")</option>
+                                <option value="LP" {{ old('format', 'LP') == 'LP' ? 'selected' : '' }}>LP (12")</option>
                                 <option value="7&quot;" {{ old('format') == '7"' ? 'selected' : '' }}>7" (Compacto)</option>
                                 <option value="10&quot;" {{ old('format') == '10"' ? 'selected' : '' }}>10"</option>
                                 <option value="12&quot;" {{ old('format') == '12"' ? 'selected' : '' }}>12" (Maxi)</option>
@@ -449,10 +448,11 @@
                         </div>
                         <div>
                             <label for="weight_id" class="block text-sm font-medium text-gray-700">Peso</label>
+                            @php $defaultWeightId = $weights->values()->get(1)?->id; @endphp
                             <select name="weight_id" id="weight_id" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="">Selecione...</option>
                                 @foreach($weights as $weight)
-                                    <option value="{{ $weight->id }}" {{ old('weight_id') == $weight->id ? 'selected' : '' }}>
+                                    <option value="{{ $weight->id }}" {{ old('weight_id', $defaultWeightId) == $weight->id ? 'selected' : '' }}>
                                         {{ $weight->name }} ({{ $weight->formatted_value }})
                                     </option>
                                 @endforeach
@@ -460,10 +460,11 @@
                         </div>
                         <div>
                             <label for="dimension_id" class="block text-sm font-medium text-gray-700">Dimensões</label>
+                            @php $defaultDimensionId = $dimensions->values()->first()?->id; @endphp
                             <select name="dimension_id" id="dimension_id" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="">Selecione...</option>
                                 @foreach($dimensions as $dimension)
-                                    <option value="{{ $dimension->id }}" {{ old('dimension_id') == $dimension->id ? 'selected' : '' }}>
+                                    <option value="{{ $dimension->id }}" {{ old('dimension_id', $defaultDimensionId) == $dimension->id ? 'selected' : '' }}>
                                         {{ $dimension->name }} ({{ $dimension->formatted_dimensions }})
                                     </option>
                                 @endforeach
