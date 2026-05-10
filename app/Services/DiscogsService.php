@@ -172,6 +172,36 @@ class DiscogsService
     }
 
     /**
+     * Get marketplace stats for a release (lowest price + num for sale).
+     */
+    public function getMarketplaceStats(int $releaseId, string $currency = 'BRL'): ?array
+    {
+        $cacheKey = "discogs_mkt_stats_{$releaseId}_{$currency}";
+
+        return Cache::remember($cacheKey, now()->addMinutes(60), function () use ($releaseId, $currency) {
+            try {
+                $response = Http::withHeaders($this->getHeaders())
+                    ->get("{$this->baseUrl}/marketplace/stats/{$releaseId}", [
+                        'curr_abbr' => $currency,
+                    ]);
+
+                if ($response->successful()) {
+                    return $response->json();
+                }
+
+                Log::warning('Discogs marketplace stats failed', [
+                    'release_id' => $releaseId,
+                    'status' => $response->status(),
+                ]);
+                return null;
+            } catch (\Exception $e) {
+                Log::error('Discogs marketplace stats exception', ['message' => $e->getMessage()]);
+                return null;
+            }
+        });
+    }
+
+    /**
      * Parse release data to our format
      */
     public function parseReleaseData(array $release): array

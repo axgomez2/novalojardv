@@ -182,9 +182,66 @@
                 </div>
 
                 <!-- Part 2: Categories -->
-                <div class="rounded-lg bg-white p-6 shadow" x-data="{ expandedCategories: [] }">
-                    <h3 class="mb-4 text-lg font-medium text-gray-900">Categorias</h3>
+                <div class="rounded-lg bg-white p-6 shadow" x-data="categoriesPanel()">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="text-lg font-medium text-gray-900">Categorias</h3>
+                        <button type="button" @click="showForm = !showForm"
+                                class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Nova categoria
+                        </button>
+                    </div>
                     <p class="mb-4 text-sm text-gray-500">Clique em uma categoria principal para ver as subcategorias. Marque múltiplas categorias e defina a principal.</p>
+
+                    {{-- Form inline para criar nova categoria --}}
+                    <div x-show="showForm" x-cloak x-collapse class="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-medium text-gray-700">Nome da categoria</label>
+                                <input type="text" x-model="newName" @keydown.enter.prevent="createCategory()"
+                                       placeholder="Ex: Deep House"
+                                       class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700">Categoria pai (opcional)</label>
+                                <select x-model="newParentId" class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">— Nenhuma (raiz) —</option>
+                                    @foreach($categories as $parent)
+                                        <option value="{{ $parent->id }}">{{ $parent->name }}</option>
+                                    @endforeach
+                                    <template x-for="c in createdParents" :key="c.id">
+                                        <option :value="c.id" x-text="c.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex items-center gap-2">
+                            <button type="button" @click="createCategory()" :disabled="creating || !newName.trim()"
+                                    class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                                <span x-text="creating ? 'Criando...' : 'Criar e adicionar'"></span>
+                            </button>
+                            <button type="button" @click="showForm = false; newName = ''"
+                                    class="text-xs text-gray-600 hover:text-gray-800">Cancelar</button>
+                            <span x-show="error" class="text-xs text-red-600" x-text="error"></span>
+                        </div>
+                    </div>
+
+                    {{-- Categorias criadas inline --}}
+                    <template x-for="cat in created" :key="cat.id">
+                        <div class="mb-2 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                            <input type="checkbox" :name="'categories[]'" :value="cat.id" :id="'cat_new_' + cat.id" checked
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <label :for="'cat_new_' + cat.id" class="flex-1 font-medium text-gray-900">
+                                <span x-text="cat.name"></span>
+                                <span x-show="cat.parent_name" class="text-xs text-gray-500"> (em <span x-text="cat.parent_name"></span>)</span>
+                                <span class="ml-2 rounded bg-green-200 px-1.5 py-0.5 text-[10px] uppercase text-green-800">nova</span>
+                            </label>
+                            <label class="flex items-center gap-1 text-xs text-gray-500">
+                                <input type="radio" name="primary_category" :value="cat.id" class="text-indigo-600 focus:ring-indigo-500">
+                                <span>Principal</span>
+                            </label>
+                        </div>
+                    </template>
                     <div class="space-y-2">
                         @foreach($categories as $parent)
                             <div class="rounded-lg border border-gray-200 overflow-hidden">
@@ -241,6 +298,47 @@
                 <!-- Part 3: Commercial Data -->
                 <div class="rounded-lg bg-white p-6 shadow">
                     <h3 class="mb-4 text-lg font-medium text-gray-900">Dados Comerciais</h3>
+
+                    @if(!empty($marketplaceStats))
+                        @php
+                            $lowestValue = data_get($marketplaceStats, 'lowest_price.value');
+                            $lowestCurrency = data_get($marketplaceStats, 'lowest_price.currency', 'BRL');
+                            $numForSale = data_get($marketplaceStats, 'num_for_sale');
+                            $discogsUrl = $vinylMaster?->discogs_url ?? ($vinylMaster?->discogs_release_id ? 'https://www.discogs.com/release/' . $vinylMaster->discogs_release_id : null);
+                        @endphp
+                        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex gap-3">
+                                    <svg class="h-5 w-5 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <div class="text-sm">
+                                        <p class="font-medium text-amber-900">Referência do Discogs Marketplace</p>
+                                        <div class="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-amber-800">
+                                            @if($lowestValue)
+                                                <span><strong>Menor preço:</strong> {{ number_format($lowestValue, 2, ',', '.') }} {{ $lowestCurrency }}</span>
+                                            @else
+                                                <span><strong>Menor preço:</strong> indisponível</span>
+                                            @endif
+                                            <span><strong>À venda no mundo:</strong> {{ $numForSale ?? 0 }} {{ ($numForSale ?? 0) == 1 ? 'cópia' : 'cópias' }}</span>
+                                        </div>
+                                        <p class="mt-1 text-xs text-amber-700">Use como referência para precificar — especialmente discos usados. Preços são da menor oferta global.</p>
+                                    </div>
+                                </div>
+                                @if($discogsUrl)
+                                    <a href="{{ $discogsUrl }}" target="_blank" class="flex-shrink-0 text-xs text-amber-700 underline hover:text-amber-900">Ver no Discogs</a>
+                                @endif
+                            </div>
+                            @if($lowestValue)
+                                <div class="mt-3 flex items-center gap-2">
+                                    <button type="button"
+                                            onclick="document.getElementById('sell_price').value = '{{ number_format($lowestValue, 2, '.', '') }}'"
+                                            class="rounded-md bg-amber-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-700">
+                                        Usar menor preço como sugestão
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
                     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <div>
                             <label for="sell_price" class="block text-sm font-medium text-gray-700">Preço de Venda *</label>
@@ -522,4 +620,61 @@
         }
     </script>
     @endif
+
+    <script>
+        function categoriesPanel() {
+            const parentNameMap = @json($categories->pluck('name', 'id'));
+            return {
+                expandedCategories: [],
+                showForm: false,
+                newName: '',
+                newParentId: '',
+                creating: false,
+                error: '',
+                created: [],
+                get createdParents() {
+                    return this.created.filter(c => !c.parent_id);
+                },
+                async createCategory() {
+                    if (!this.newName.trim() || this.creating) return;
+                    this.creating = true;
+                    this.error = '';
+                    try {
+                        const res = await fetch('{{ route('admin.categories.ajax') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            },
+                            body: JSON.stringify({
+                                name: this.newName.trim(),
+                                parent_id: this.newParentId || null,
+                            }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                            this.error = data.message || 'Erro ao criar categoria.';
+                            return;
+                        }
+                        const parentName = data.parent_id
+                            ? (parentNameMap[data.parent_id] || this.created.find(c => c.id === data.parent_id)?.name || null)
+                            : null;
+                        this.created.push({
+                            id: data.id,
+                            name: data.name,
+                            parent_id: data.parent_id,
+                            parent_name: parentName,
+                        });
+                        this.newName = '';
+                        this.newParentId = '';
+                    } catch (e) {
+                        this.error = 'Erro de rede: ' + e.message;
+                    } finally {
+                        this.creating = false;
+                    }
+                }
+            }
+        }
+    </script>
 </x-admin-layout>

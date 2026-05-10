@@ -108,6 +108,15 @@ class VinylStockController extends Controller
         }
         $nextInternalCode = 'RDV-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
 
+        // Busca stats do marketplace Discogs (preço/quantidade) para auxiliar precificação
+        $marketplaceStats = null;
+        if ($vinylMaster && $vinylMaster->discogs_release_id) {
+            $discogs = app(\App\Services\DiscogsService::class);
+            if ($discogs->isConfigured()) {
+                $marketplaceStats = $discogs->getMarketplaceStats((int) $vinylMaster->discogs_release_id);
+            }
+        }
+
         return view('admin.vinyl-stocks.create', compact(
             'vinylMaster',
             'vinylMasters',
@@ -118,7 +127,8 @@ class VinylStockController extends Controller
             'suppliers',
             'categories',
             'productTypes',
-            'nextInternalCode'
+            'nextInternalCode',
+            'marketplaceStats'
         ));
     }
 

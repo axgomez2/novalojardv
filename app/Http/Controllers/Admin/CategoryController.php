@@ -53,6 +53,34 @@ class CategoryController extends Controller
             ->with('success', 'Categoria criada com sucesso!');
     }
 
+    /**
+     * Criação rápida via AJAX (usado no cadastro de vinil).
+     */
+    public function storeAjax(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'parent_id' => 'nullable|exists:categories,id',
+        ]);
+
+        $validated['is_active'] = true;
+
+        $category = Category::create($validated);
+
+        AdminActivityLog::log(
+            auth('admin')->user(),
+            'create',
+            "Categoria '{$category->name}' criada (ajax)",
+            $category
+        );
+
+        return response()->json([
+            'id' => $category->id,
+            'name' => $category->name,
+            'parent_id' => $category->parent_id,
+        ]);
+    }
+
     public function edit(Category $category): View
     {
         $parents = Category::parents()

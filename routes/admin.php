@@ -121,6 +121,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         });
 
         // Categories (Categorias)
+        Route::post('categories/ajax', [CategoryController::class, 'storeAjax'])->name('categories.ajax');
         Route::resource('categories', CategoryController::class)->except(['show']);
 
         // Settings Routes
