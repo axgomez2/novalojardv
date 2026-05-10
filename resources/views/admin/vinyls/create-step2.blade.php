@@ -61,7 +61,6 @@
         <input type="hidden" name="discogs_release_id" value="{{ $data['discogs_release_id'] }}">
         <input type="hidden" name="discogs_master_id" value="{{ $data['discogs_master_id'] }}">
         <input type="hidden" name="discogs_url" value="{{ $data['discogs_url'] }}">
-        <input type="hidden" name="cover_image" value="{{ $data['cover_image'] }}">
 
         @foreach($data['images'] ?? [] as $index => $image)
             <input type="hidden" name="images[{{ $index }}][type]" value="{{ $image['type'] }}">
@@ -87,19 +86,46 @@
 
         <div class="grid gap-6 lg:grid-cols-3">
             <!-- Cover Image -->
-            <div class="lg:col-span-1">
+            <div class="lg:col-span-1"
+                 x-data='coverSelector(@json(array_values(array_filter(array_map(fn($i) => $i["uri"] ?? null, $data["images"] ?? [])))), @json($data["cover_image"] ?? ""))'>
                 <div class="sticky top-24 rounded-lg bg-white p-4 shadow">
+                    <input type="hidden" name="cover_image" :value="selected">
                     <div class="aspect-square overflow-hidden rounded-lg bg-gray-100">
-                        @if($data['cover_image'])
-                            <img src="{{ $data['cover_image'] }}" alt="{{ $data['title'] }}" class="h-full w-full object-cover">
-                        @else
+                        <template x-if="selected">
+                            <img :src="selected" :alt="@json($data['title'])" class="h-full w-full object-cover">
+                        </template>
+                        <template x-if="!selected">
                             <div class="flex h-full items-center justify-center">
                                 <svg class="h-16 w-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
                                 </svg>
                             </div>
-                        @endif
+                        </template>
                     </div>
+
+                    {{-- Galeria de imagens para seleção de capa --}}
+                    <template x-if="images.length > 1">
+                        <div class="mt-4">
+                            <div class="mb-2 flex items-center justify-between">
+                                <p class="text-xs font-medium text-gray-700">Escolha a imagem de capa (<span x-text="images.length"></span>)</p>
+                                <button type="button" @click="pickRandom()"
+                                        class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h5v5M4 4l6 6m10-6h-5v5m5-5l-6 6M4 20h5v-5M4 20l6-6m10 6h-5v-5m5 5l-6-6"/></svg>
+                                    Aleatória
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-4 gap-2">
+                                <template x-for="(img, i) in images" :key="i">
+                                    <button type="button" @click="selected = img"
+                                            :class="selected === img ? 'ring-2 ring-indigo-500' : 'ring-1 ring-gray-200 hover:ring-gray-400'"
+                                            class="aspect-square overflow-hidden rounded bg-gray-100 focus:outline-none">
+                                        <img :src="img" class="h-full w-full object-cover" loading="lazy">
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
                     @if($data['discogs_url'])
                         <a href="{{ $data['discogs_url'] }}" target="_blank" class="mt-4 flex items-center justify-center gap-2 text-sm text-indigo-600 hover:text-indigo-500">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -356,4 +382,19 @@
             </div>
         </div>
     </form>
+
+    <script>
+        function coverSelector(images, initial) {
+            return {
+                images: Array.isArray(images) ? images : [],
+                selected: initial || (Array.isArray(images) && images.length ? images[0] : ''),
+                pickRandom() {
+                    if (!this.images.length) return;
+                    const pool = this.images.filter(i => i !== this.selected);
+                    const source = pool.length ? pool : this.images;
+                    this.selected = source[Math.floor(Math.random() * source.length)];
+                }
+            }
+        }
+    </script>
 </x-admin-layout>
