@@ -66,29 +66,54 @@ Instruções:
 - Retorne APENAS o texto da descrição, sem aspas e sem prefixos como "Descrição:".
 PROMPT;
 
-        try {
-            $response = Http::timeout(30)
-                ->post("{$this->endpoint}/{$this->model}:generateContent?key={$this->apiKey}", [
-                    'contents' => [[
-                        'parts' => [['text' => $prompt]],
-                    ]],
-                    'generationConfig' => [
-                        'temperature' => 0.7,
-                        'maxOutputTokens' => 400,
-                    ],
-                ]);
+        $payload = [
+            'contents' => [[
+                'parts' => [['text' => $prompt]],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.7,
+                'maxOutputTokens' => 400,
+            ],
+        ];
 
-            if (!$response->successful()) {
-                Log::error('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
-                throw new \RuntimeException('Falha ao gerar descrição: ' . $response->status());
+        $attempts = 0;
+        $maxAttempts = 3;
+
+        while (true) {
+            $attempts++;
+            try {
+                $response = Http::timeout(30)
+                    ->post("{$this->endpoint}/{$this->model}:generateContent?key={$this->apiKey}", $payload);
+
+                if ($response->successful()) {
+                    $text = data_get($response->json(), 'candidates.0.content.parts.0.text', '');
+                    return trim((string) $text);
+                }
+
+                $status = $response->status();
+                Log::warning('Gemini API error', ['status' => $status, 'body' => $response->body(), 'attempt' => $attempts]);
+
+                // Retry em 429 (rate limit) e 503 (overloaded)
+                if (in_array($status, [429, 503]) && $attempts < $maxAttempts) {
+                    sleep($attempts * 2); // backoff: 2s, 4s
+                    continue;
+                }
+
+                if ($status === 429) {
+                    throw new \RuntimeException('Limite de requisições da IA atingido. Aguarde 1 minuto e tente novamente, ou troque o modelo no .env (GEMINI_MODEL=gemini-1.5-flash).');
+                }
+
+                if ($status === 401 || $status === 403) {
+                    throw new \RuntimeException('Chave do Gemini inválida ou sem permissão. Verifique GEMINI_API_KEY no .env.');
+                }
+
+                throw new \RuntimeException("Falha ao gerar descrição (HTTP {$status}).");
+            } catch (\RuntimeException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                Log::error('AiContentService::generateVinylDescription', ['error' => $e->getMessage()]);
+                throw new \RuntimeException('Erro ao chamar IA: ' . $e->getMessage());
             }
-
-            $text = data_get($response->json(), 'candidates.0.content.parts.0.text', '');
-
-            return trim((string) $text);
-        } catch (\Throwable $e) {
-            Log::error('AiContentService::generateVinylDescription', ['error' => $e->getMessage()]);
-            throw new \RuntimeException('Erro ao chamar IA: ' . $e->getMessage());
         }
     }
 }
