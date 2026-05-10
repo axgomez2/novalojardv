@@ -279,7 +279,7 @@ class VinylController extends Controller
             }
         }
 
-        // Create or find record label
+        // Create or find record label (busca logo no Discogs se possível)
         $recordLabelId = null;
         if (!empty($validated['labels'][0])) {
             $labelData = $validated['labels'][0];
@@ -291,6 +291,20 @@ class VinylController extends Controller
                     'is_active' => true,
                 ]
             );
+
+            // Busca logo no Discogs caso ainda não exista
+            if (empty($recordLabel->logo) && !empty($labelData['discogs_id']) && $this->discogs->isConfigured()) {
+                $labelInfo = $this->discogs->getLabel((int) $labelData['discogs_id']);
+                $logoUrl = data_get($labelInfo, 'images.0.uri') ?? data_get($labelInfo, 'images.0.uri150');
+                if ($logoUrl) {
+                    $recordLabel->update([
+                        'logo' => $logoUrl,
+                        'description' => $recordLabel->description ?: data_get($labelInfo, 'profile'),
+                        'website' => $recordLabel->website ?: data_get($labelInfo, 'urls.0'),
+                    ]);
+                }
+            }
+
             $recordLabelId = $recordLabel->id;
         }
 

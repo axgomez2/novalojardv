@@ -65,6 +65,12 @@ class VinylApiFormatter
             'slug' => $master?->slug,
             'artist' => $master?->artist_names ?? 'Artista Desconhecido',
             'record_label' => $master?->recordLabel?->name,
+            'record_label_data' => $master?->recordLabel ? [
+                'id' => $master->recordLabel->id,
+                'name' => $master->recordLabel->name,
+                'slug' => $master->recordLabel->slug,
+                'logo' => $master->recordLabel->logo,
+            ] : null,
             'release_year' => $master?->release_year,
             'cover_image' => $master?->cover_url ?? '/images/vinyl-placeholder.jpg',
             'price' => $stock->current_price,
