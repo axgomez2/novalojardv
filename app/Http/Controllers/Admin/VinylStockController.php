@@ -463,7 +463,7 @@ class VinylStockController extends Controller
             "Estoque de vinil excluído: {$title}"
         );
 
-        $vinylStock->delete();
+        $vinylStock->forceDelete();
 
         return redirect()
             ->route('admin.vinyl-stocks.index')

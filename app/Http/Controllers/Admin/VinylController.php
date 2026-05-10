@@ -394,7 +394,9 @@ class VinylController extends Controller
             "Disco '{$title}' excluído"
         );
 
-        $vinyl->delete();
+        // Hard delete: remove estoques relacionados e o master
+        $vinyl->stocks()->withTrashed()->forceDelete();
+        $vinyl->forceDelete();
 
         return redirect()
             ->route('admin.vinyls.index')
