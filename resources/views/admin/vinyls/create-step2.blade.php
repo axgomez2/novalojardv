@@ -132,10 +132,71 @@
                             <input type="text" name="country" id="country" value="{{ $data['country'] }}"
                                    class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
-                        <div class="sm:col-span-2">
-                            <label for="description" class="block text-sm font-medium text-gray-700">Descrição</label>
-                            <textarea name="description" id="description" rows="3"
+                        <div class="sm:col-span-2" x-data="aiDescription()">
+                            <div class="flex items-center justify-between">
+                                <label for="description" class="block text-sm font-medium text-gray-700">Descrição</label>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" @click="generate('translate')" :disabled="loading"
+                                            class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                                        Traduzir/Reescrever
+                                    </button>
+                                    <button type="button" @click="generate('create')" :disabled="loading"
+                                            class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">
+                                        <svg x-show="!loading" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                                        <svg x-show="loading" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                        <span x-text="loading ? 'Gerando...' : 'Gerar com IA'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea name="description" id="description" rows="5" x-ref="textarea"
                                       class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ $data['notes'] ?? '' }}</textarea>
+                            <p x-show="error" x-cloak class="mt-1 text-xs text-red-600" x-text="error"></p>
+                            <p class="mt-1 text-xs text-gray-500">Use "Traduzir/Reescrever" se já houver texto em inglês no campo, ou "Gerar com IA" para criar do zero.</p>
+
+                            <script>
+                                function aiDescription() {
+                                    return {
+                                        loading: false,
+                                        error: '',
+                                        async generate(mode) {
+                                            this.loading = true;
+                                            this.error = '';
+                                            try {
+                                                const payload = {
+                                                    title: document.getElementById('title')?.value || @json($data['title'] ?? ''),
+                                                    artists: @json(collect($data['artists'] ?? [])->pluck('name')->implode(', ')),
+                                                    year: document.getElementById('release_year')?.value || @json((string) ($data['year'] ?? '')),
+                                                    country: document.getElementById('country')?.value || @json($data['country'] ?? ''),
+                                                    label: @json(collect($data['labels'] ?? [])->pluck('name')->implode(', ')),
+                                                    genres: @json(implode(', ', $data['genres'] ?? [])),
+                                                    styles: @json(implode(', ', $data['styles'] ?? [])),
+                                                    notes: mode === 'translate' ? this.$refs.textarea.value : '',
+                                                };
+                                                const res = await fetch('{{ route('admin.vinyls.ai.description') }}', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        'Accept': 'application/json',
+                                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                                    },
+                                                    body: JSON.stringify(payload),
+                                                });
+                                                const data = await res.json();
+                                                if (!res.ok) {
+                                                    this.error = data.error || 'Erro ao gerar descrição.';
+                                                    return;
+                                                }
+                                                this.$refs.textarea.value = data.description || '';
+                                            } catch (e) {
+                                                this.error = 'Erro de rede: ' + e.message;
+                                            } finally {
+                                                this.loading = false;
+                                            }
+                                        }
+                                    }
+                                }
+                            </script>
                         </div>
                     </div>
                 </div>

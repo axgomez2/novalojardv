@@ -35,6 +35,11 @@ return [
         ],
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+    ],
+
     'discogs' => [
         'token' => env('DISCOGS_TOKEN'),
         'user_agent' => env('DISCOGS_USER_AGENT', 'VinilStore/1.0'),

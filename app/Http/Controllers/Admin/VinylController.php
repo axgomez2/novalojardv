@@ -9,7 +9,9 @@ use App\Models\Category;
 use App\Models\RecordLabel;
 use App\Models\Track;
 use App\Models\VinylMaster;
+use App\Services\AiContentService;
 use App\Services\DiscogsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -96,10 +98,46 @@ class VinylController extends Controller
             $request->get('query'),
             'release',
             50,
-            $request->get('page', 1)
+            (int) $request->get('page', 1),
+            [
+                'year' => $request->get('year'),
+                'country' => $request->get('country'),
+                'label' => $request->get('label'),
+            ]
         );
 
         return response()->json($results);
+    }
+
+    /**
+     * Gera/traduz descrição via IA (Gemini)
+     */
+    public function generateDescription(Request $request, AiContentService $ai): JsonResponse
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'artists' => 'nullable|string|max:500',
+            'year' => 'nullable|string|max:10',
+            'country' => 'nullable|string|max:100',
+            'label' => 'nullable|string|max:255',
+            'genres' => 'nullable|string|max:255',
+            'styles' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
+        ]);
+
+        if (!$ai->isConfigured()) {
+            return response()->json(['error' => 'IA não configurada. Defina GEMINI_API_KEY no .env'], 400);
+        }
+
+        try {
+            $description = $ai->generateVinylDescription($request->only([
+                'title', 'artists', 'year', 'country', 'label', 'genres', 'styles', 'notes',
+            ]));
+
+            return response()->json(['description' => $description]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**

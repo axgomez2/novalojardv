@@ -98,6 +98,36 @@
                     <span x-text="loading ? 'Buscando...' : 'Buscar'"></span>
                 </button>
             </div>
+
+            {{-- Filtros adicionais --}}
+            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                    <label for="filter-year" class="block text-xs font-medium text-gray-600">Ano</label>
+                    <input type="text" id="filter-year" x-model="filters.year"
+                           @keydown.enter.prevent="search()"
+                           placeholder="Ex: 1985 ou 1980-1989"
+                           class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="filter-label" class="block text-xs font-medium text-gray-600">Gravadora</label>
+                    <input type="text" id="filter-label" x-model="filters.label"
+                           @keydown.enter.prevent="search()"
+                           placeholder="Ex: Blue Note"
+                           class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="filter-country" class="block text-xs font-medium text-gray-600">País</label>
+                    <input type="text" id="filter-country" x-model="filters.country"
+                           @keydown.enter.prevent="search()"
+                           placeholder="Ex: Brazil, US, UK"
+                           class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+            </div>
+            <div x-show="filters.year || filters.label || filters.country" class="mt-2">
+                <button type="button" @click="clearFilters()" class="text-xs text-gray-500 hover:text-gray-700 underline">
+                    Limpar filtros
+                </button>
+            </div>
         </div>
 
         <!-- Error Message -->
@@ -175,6 +205,7 @@
         function discogsSearch() {
             return {
                 query: '',
+                filters: { year: '', label: '', country: '' },
                 results: [],
                 loading: false,
                 error: null,
@@ -185,6 +216,10 @@
                     items: 0
                 },
 
+                clearFilters() {
+                    this.filters = { year: '', label: '', country: '' };
+                },
+
                 async search(page = 1) {
                     if (!this.query.trim()) return;
 
@@ -193,7 +228,15 @@
                     this.pagination.page = page;
 
                     try {
-                        const response = await fetch(`{{ route('admin.vinyls.discogs.search') }}?query=${encodeURIComponent(this.query)}&page=${page}`);
+                        const params = new URLSearchParams({
+                            query: this.query,
+                            page: page,
+                        });
+                        if (this.filters.year) params.append('year', this.filters.year);
+                        if (this.filters.label) params.append('label', this.filters.label);
+                        if (this.filters.country) params.append('country', this.filters.country);
+
+                        const response = await fetch(`{{ route('admin.vinyls.discogs.search') }}?${params.toString()}`);
                         const data = await response.json();
 
                         if (data.error) {

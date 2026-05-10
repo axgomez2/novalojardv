@@ -101,6 +101,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
 
             // Discogs API
             Route::get('/discogs/search', [VinylController::class, 'searchDiscogs'])->name('discogs.search');
+            Route::post('/ai/description', [VinylController::class, 'generateDescription'])->name('ai.description');
             Route::get('/discogs/release/{releaseId}', [VinylController::class, 'getDiscogsRelease'])->name('discogs.release');
         });
 

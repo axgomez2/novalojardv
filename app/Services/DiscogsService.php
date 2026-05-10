@@ -29,19 +29,24 @@ class DiscogsService
     /**
      * Search for releases on Discogs
      */
-    public function search(string $query, string $type = 'release', int $perPage = 20, int $page = 1): array
+    public function search(string $query, string $type = 'release', int $perPage = 20, int $page = 1, array $filters = []): array
     {
-        $cacheKey = "discogs_search_{$type}_" . md5($query) . "_{$page}_{$perPage}";
+        $params = array_filter([
+            'q' => $query,
+            'type' => $type,
+            'per_page' => $perPage,
+            'page' => $page,
+            'year' => $filters['year'] ?? null,
+            'country' => $filters['country'] ?? null,
+            'label' => $filters['label'] ?? null,
+        ], fn ($v) => $v !== null && $v !== '');
 
-        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($query, $type, $perPage, $page) {
+        $cacheKey = 'discogs_search_' . md5(json_encode($params));
+
+        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($params) {
             try {
                 $response = Http::withHeaders($this->getHeaders())
-                    ->get("{$this->baseUrl}/database/search", [
-                        'q' => $query,
-                        'type' => $type,
-                        'per_page' => $perPage,
-                        'page' => $page,
-                    ]);
+                    ->get("{$this->baseUrl}/database/search", $params);
 
                 if ($response->successful()) {
                     return $response->json();
