@@ -82,7 +82,7 @@ PROMPT;
         while (true) {
             $attempts++;
             try {
-                $response = Http::timeout(30)
+                $response = Http::timeout(60)->connectTimeout(15)
                     ->post("{$this->endpoint}/{$this->model}:generateContent?key={$this->apiKey}", $payload);
 
                 if ($response->successful()) {
