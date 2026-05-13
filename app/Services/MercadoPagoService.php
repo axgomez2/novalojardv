@@ -123,6 +123,82 @@ class MercadoPagoService
     }
 
     /**
+     * Criar preferência de pagamento genérica (Checkout Pro) — útil para
+     * pagamentos parciais como sinal/saldo de pré-vendas.
+     *
+     * @param string $title Título que aparece no checkout (ex: "Sinal da pré-venda PV-2026-00001")
+     * @param float $amount Valor único
+     * @param string $externalReference ex: "PREORDER-123-SIGNAL" ou "PREORDER-123-BALANCE"
+     * @param array $payer ['name' => ..., 'email' => ...]
+     * @param string|null $returnPath rota do frontend para back_urls (ex: "/minhas-pre-vendas/PV-2026-00001")
+     */
+    public function createGenericPreference(string $title, float $amount, string $externalReference, array $payer, ?string $returnPath = null): array
+    {
+        if (!$this->accessToken) {
+            return ['error' => 'Token do Mercado Pago não configurado'];
+        }
+
+        try {
+            $frontendUrl = config('app.frontend_url') ?: env('FRONTEND_URL', 'http://localhost:3000');
+            $backendUrl = config('app.url') ?: env('APP_URL', 'http://localhost');
+            $isLocalhost = str_contains($frontendUrl, 'localhost') || str_contains($frontendUrl, '127.0.0.1');
+
+            $payload = [
+                'items' => [[
+                    'id' => $externalReference,
+                    'title' => $title,
+                    'category_id' => 'music',
+                    'quantity' => 1,
+                    'currency_id' => 'BRL',
+                    'unit_price' => round($amount, 2),
+                ]],
+                'payer' => [
+                    'name' => $payer['name'] ?? null,
+                    'email' => $payer['email'] ?? null,
+                ],
+                'external_reference' => $externalReference,
+                'statement_descriptor' => 'LOJA DISCOS',
+            ];
+
+            if (!$isLocalhost && $returnPath) {
+                $payload['back_urls'] = [
+                    'success' => $frontendUrl . $returnPath . '?status=sucesso',
+                    'failure' => $frontendUrl . $returnPath . '?status=erro',
+                    'pending' => $frontendUrl . $returnPath . '?status=pendente',
+                ];
+                $payload['auto_return'] = 'approved';
+                $payload['notification_url'] = $backendUrl . '/api/webhooks/mercadopago';
+            }
+
+            $response = Http::withToken($this->accessToken)
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->post($this->baseUrl . '/checkout/preferences', $payload);
+
+            if ($response->failed()) {
+                Log::error('Mercado Pago - Erro ao criar preferência genérica', [
+                    'ref' => $externalReference,
+                    'response' => $response->body(),
+                ]);
+                return ['error' => 'Erro ao criar preferência de pagamento'];
+            }
+
+            $data = $response->json();
+            $initPoint = $this->isSandbox
+                ? ($data['sandbox_init_point'] ?? $data['init_point'])
+                : $data['init_point'];
+
+            return [
+                'preference_id' => $data['id'],
+                'init_point' => $initPoint,
+                'is_sandbox' => $this->isSandbox,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Mercado Pago - Exceção preferência genérica', ['error' => $e->getMessage()]);
+            return ['error' => 'Erro ao conectar com Mercado Pago: ' . $e->getMessage()];
+        }
+    }
+
+    /**
      * Criar pagamento PIX usando a API de Orders (funciona com credenciais de teste)
      */
     public function createPixPayment(ClientOrder $order): array
@@ -327,6 +403,11 @@ class MercadoPagoService
                 return false;
             }
 
+            // Pré-vendas usam external_reference no formato PREORDER-{id}-{SIGNAL|BALANCE}
+            if (str_starts_with($externalReference, 'PREORDER-')) {
+                return $this->handlePreOrderPaymentWebhook($externalReference, $paymentId, $paymentData);
+            }
+
             $order = ClientOrder::where('order_number', $externalReference)->first();
 
             if (!$order) {
@@ -371,6 +452,58 @@ class MercadoPagoService
             Log::error('Mercado Pago - Erro no webhook', ['error' => $e->getMessage()]);
             return false;
         }
+    }
+
+    /**
+     * Tratamento de pagamento via webhook para pré-vendas.
+     */
+    protected function handlePreOrderPaymentWebhook(string $externalReference, string $paymentId, array $paymentData): bool
+    {
+        // PREORDER-{id}-SIGNAL ou PREORDER-{id}-BALANCE
+        $parts = explode('-', $externalReference);
+        if (count($parts) < 3) {
+            Log::warning('Webhook PREORDER com formato inválido', ['ref' => $externalReference]);
+            return false;
+        }
+
+        $preOrderId = (int) $parts[1];
+        $kind = strtoupper($parts[2]); // SIGNAL ou BALANCE
+
+        $preOrder = \App\Models\PreOrder::find($preOrderId);
+        if (!$preOrder) {
+            Log::warning('Webhook: pré-venda não encontrada', ['id' => $preOrderId]);
+            return false;
+        }
+
+        $isApproved = ($paymentData['status'] ?? null) === 'approved';
+
+        if ($kind === 'SIGNAL') {
+            $preOrder->signal_payment_id = $paymentId;
+            $preOrder->signal_payment_method = 'gateway';
+            if ($isApproved && !$preOrder->signal_paid_at) {
+                $preOrder->changeStatus(
+                    \App\Enums\PreOrderStatus::SignalPaid,
+                    'Sinal pago via Mercado Pago (webhook)',
+                    'system'
+                );
+            } else {
+                $preOrder->save();
+            }
+        } elseif ($kind === 'BALANCE') {
+            $preOrder->balance_payment_id = $paymentId;
+            $preOrder->balance_payment_method = 'gateway';
+            if ($isApproved && !$preOrder->balance_paid_at) {
+                $preOrder->changeStatus(
+                    \App\Enums\PreOrderStatus::BalancePaid,
+                    'Saldo pago via Mercado Pago (webhook)',
+                    'system'
+                );
+            } else {
+                $preOrder->save();
+            }
+        }
+
+        return true;
     }
 
     /**

@@ -157,6 +157,9 @@
                                 <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium bg-{{ $stock->availability_color }}-100 text-{{ $stock->availability_color }}-800">
                                     {{ $stock->availability_label }}
                                 </span>
+                                @if($stock->visibility === 'private_preorder')
+                                    <span class="ml-1 inline-flex rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-bold text-white" title="Oculto do site (encomenda)">PRIVADO</span>
+                                @endif
                                 @if($stock->isOnPromotion())
                                     <span class="mt-1 block text-xs text-red-600 font-medium">Em promoção</span>
                                 @endif

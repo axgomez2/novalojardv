@@ -72,6 +72,23 @@
                                 <option value="preorder" {{ old('availability', $vinylStock->availability) == 'preorder' ? 'selected' : '' }}>Pré-venda</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label for="visibility" class="block text-sm font-medium text-gray-700">Visibilidade</label>
+                            <select name="visibility" id="visibility" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="public" {{ old('visibility', $vinylStock->visibility) == 'public' ? 'selected' : '' }}>Pública (aparece no site)</option>
+                                <option value="private_preorder" {{ old('visibility', $vinylStock->visibility) == 'private_preorder' ? 'selected' : '' }}>Privada — encomenda exclusiva (oculto do site)</option>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">Use "Privada" para encomendas atendidas via pré-venda direta.</p>
+                        </div>
+
+                        <div>
+                            <label for="default_signal_percentage" class="block text-sm font-medium text-gray-700">Sinal padrão (%) — pré-venda</label>
+                            <input type="number" step="0.01" min="0" max="100" name="default_signal_percentage" id="default_signal_percentage"
+                                   value="{{ old('default_signal_percentage', $vinylStock->default_signal_percentage) }}" placeholder="Ex: 50"
+                                   class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <p class="mt-1 text-xs text-gray-500">Sugestão usada ao criar pré-vendas deste disco.</p>
+                        </div>
                         <div>
                             <label for="release_date" class="block text-sm font-medium text-gray-700">Data de Lançamento</label>
                             <input type="date" name="release_date" id="release_date" value="{{ old('release_date', $vinylStock->release_date?->format('Y-m-d')) }}"

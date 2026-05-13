@@ -202,6 +202,7 @@ Route::prefix('vinyls')->group(function () {
     // Novidades - Discos novos (excluindo pré-venda), incluindo sem estoque
     Route::get('/new', function () use ($applySection) {
         $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+            ->where('visibility', 'public')
             ->where('is_new', true)
             ->where('availability', 'available')
             ->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
@@ -219,6 +220,7 @@ Route::prefix('vinyls')->group(function () {
     // Pré-Venda - Discos novos em pré-venda
     Route::get('/preorder', function () use ($applySection) {
         $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+            ->where('visibility', 'public')
             ->where('is_new', true)
             ->where('availability', 'preorder')
             ->orderBy('release_date', 'asc');
@@ -235,6 +237,7 @@ Route::prefix('vinyls')->group(function () {
     // Ofertas - Discos em promoção, incluindo sem estoque
     Route::get('/deals', function () use ($applySection) {
         $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+            ->where('visibility', 'public')
             ->where('is_promotional', true)
             ->whereIn('availability', ['available', 'featured'])
             ->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
@@ -252,6 +255,7 @@ Route::prefix('vinyls')->group(function () {
     // Usados - Discos usados por ordem de entrada, incluindo sem estoque
     Route::get('/used', function () use ($applySection) {
         $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+            ->where('visibility', 'public')
             ->where('is_new', false)
             ->whereIn('availability', ['available', 'featured'])
             ->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
@@ -269,6 +273,7 @@ Route::prefix('vinyls')->group(function () {
     // Discos usados para DJs (seção DJ - singles, maxis, promos - apenas usados), incluindo sem estoque
     Route::get('/dj', function () {
         $vinyls = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+            ->where('visibility', 'public')
             ->where('store_section', 'dj')
             ->where('is_new', false)
             ->whereIn('availability', ['available', 'featured'])
@@ -284,6 +289,7 @@ Route::prefix('vinyls')->group(function () {
     // Álbuns / LPs (seção albums), incluindo sem estoque
     Route::get('/albums', function () {
         $vinyls = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+            ->where('visibility', 'public')
             ->where('store_section', 'albums')
             ->whereIn('availability', ['available', 'featured'])
             ->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
@@ -298,6 +304,7 @@ Route::prefix('vinyls')->group(function () {
     // Destaques, incluindo sem estoque
     Route::get('/featured', function () use ($applySection) {
         $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+            ->where('visibility', 'public')
             ->where('availability', 'featured')
             ->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
             ->orderBy('created_at', 'desc');
@@ -321,7 +328,7 @@ Route::prefix('vinyls')->group(function () {
             'mediaStatus',
             'coverStatus',
             'categories.parent'
-        ])->findOrFail($id);
+        ])->where('visibility', 'public')->findOrFail($id);
 
         return response()->json(['data' => VinylApiFormatter::detailed($stock)]);
     });
@@ -336,6 +343,7 @@ Route::prefix('vinyls')->group(function () {
         
         // Buscar discos relacionados
         $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel'])
+            ->where('visibility', 'public')
             ->where('id', '!=', $id)
             ->where('stock', '>', 0)
             ->whereIn('availability', ['available', 'featured']);
@@ -367,6 +375,7 @@ Route::prefix('vinyls')->group(function () {
     // Listagem geral com filtros, incluindo sem estoque
     Route::get('/', function () {
         $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel'])
+            ->where('visibility', 'public')
             ->where('availability', '!=', 'unavailable');
 
         // Filtros
@@ -409,6 +418,7 @@ Route::get('/search', function () {
     $searchTerms = '%' . $query . '%';
     
     $results = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+        ->where('visibility', 'public')
         ->where('availability', '!=', 'unavailable')
         ->where(function ($q) use ($searchTerms) {
             // Busca no título do disco
@@ -528,5 +538,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{orderNumber}', [App\Http\Controllers\Api\CheckoutController::class, 'getOrder']);
         Route::get('/{orderNumber}/payment-status', [App\Http\Controllers\Api\CheckoutController::class, 'checkPaymentStatus']);
         Route::post('/{orderNumber}/simulate-payment', [App\Http\Controllers\Api\CheckoutController::class, 'simulatePaymentApproval']);
+    });
+
+    // Pré-vendas (cliente)
+    Route::prefix('pre-orders')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\PreOrderClientController::class, 'index']);
+        Route::get('/{code}', [App\Http\Controllers\Api\PreOrderClientController::class, 'show']);
+        Route::post('/{code}/pay-signal', [App\Http\Controllers\Api\PreOrderClientController::class, 'paySignal']);
+        Route::post('/{code}/pay-balance', [App\Http\Controllers\Api\PreOrderClientController::class, 'payBalance']);
+        Route::post('/{code}/request-manual-pix', [App\Http\Controllers\Api\PreOrderClientController::class, 'requestManualPix']);
     });
 });

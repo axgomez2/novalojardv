@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\ChartController;
 use App\Http\Controllers\Admin\DjPlaylistController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\PreOrderController;
 use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\WeightController;
 use App\Http\Controllers\Admin\ShippingSettingsController;
@@ -123,6 +124,22 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         // Categories (Categorias)
         Route::post('categories/ajax', [CategoryController::class, 'storeAjax'])->name('categories.ajax');
         Route::resource('categories', CategoryController::class)->except(['show']);
+
+        // Pré-vendas / Encomendas
+        Route::prefix('pre-orders')->name('pre-orders.')->group(function () {
+            Route::get('/', [PreOrderController::class, 'index'])->name('index');
+            Route::get('/dashboard', [PreOrderController::class, 'dashboard'])->name('dashboard');
+            Route::get('/export', [PreOrderController::class, 'export'])->name('export');
+            Route::get('/report', [PreOrderController::class, 'report'])->name('report');
+            Route::get('/create', [PreOrderController::class, 'create'])->name('create');
+            Route::post('/', [PreOrderController::class, 'store'])->name('store');
+            Route::get('/{preOrder}', [PreOrderController::class, 'show'])->name('show');
+            Route::put('/{preOrder}', [PreOrderController::class, 'update'])->name('update');
+            Route::post('/{preOrder}/status', [PreOrderController::class, 'changeStatus'])->name('status');
+            Route::post('/{preOrder}/mark-signal-paid', [PreOrderController::class, 'markSignalPaid'])->name('mark-signal-paid');
+            Route::post('/{preOrder}/mark-balance-paid', [PreOrderController::class, 'markBalancePaid'])->name('mark-balance-paid');
+            Route::post('/{preOrder}/cancel', [PreOrderController::class, 'cancel'])->name('cancel');
+        });
 
         // Settings Routes
         Route::prefix('settings')->name('settings.')->group(function () {

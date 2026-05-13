@@ -160,6 +160,23 @@
                             <input type="date" name="release_date" id="release_date" value="{{ old('release_date') }}"
                                    class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
+
+                        <div>
+                            <label for="visibility" class="block text-sm font-medium text-gray-700">Visibilidade</label>
+                            <select name="visibility" id="visibility" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="public" {{ old('visibility', 'public') == 'public' ? 'selected' : '' }}>Pública (aparece no site)</option>
+                                <option value="private_preorder" {{ old('visibility') == 'private_preorder' ? 'selected' : '' }}>Privada — encomenda exclusiva (oculto do site)</option>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">Use "Privada" para encomendas que serão atendidas via pré-venda direta com o cliente.</p>
+                        </div>
+
+                        <div>
+                            <label for="default_signal_percentage" class="block text-sm font-medium text-gray-700">Sinal padrão (%) — pré-venda</label>
+                            <input type="number" step="0.01" min="0" max="100" name="default_signal_percentage" id="default_signal_percentage"
+                                   value="{{ old('default_signal_percentage') }}" placeholder="Ex: 50"
+                                   class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <p class="mt-1 text-xs text-gray-500">Sugestão para o cálculo de sinal ao criar pré-vendas.</p>
+                        </div>
                         <div>
                             <label for="media_status_id" class="block text-sm font-medium text-gray-700">Estado da Mídia</label>
                             <select name="media_status_id" id="media_status_id" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">

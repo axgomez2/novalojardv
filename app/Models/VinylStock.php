@@ -39,6 +39,8 @@ class VinylStock extends Model
         'promo_starts_at',
         'promo_ends_at',
         'availability',
+        'visibility',
+        'default_signal_percentage',
         'store_section',
         'release_date',
         'notes',
@@ -48,6 +50,7 @@ class VinylStock extends Model
     protected $casts = [
         'is_new' => 'boolean',
         'is_promotional' => 'boolean',
+        'default_signal_percentage' => 'decimal:2',
         'stock' => 'integer',
         'stock_min' => 'integer',
         'num_discs' => 'integer',
@@ -107,10 +110,25 @@ class VinylStock extends Model
         return $this->hasMany(StockMovement::class)->orderByDesc('created_at');
     }
 
+    public function preOrders(): HasMany
+    {
+        return $this->hasMany(PreOrder::class);
+    }
+
     // Scopes
     public function scopeAvailable($query)
     {
         return $query->where('availability', 'available')->where('stock', '>', 0);
+    }
+
+    public function scopePubliclyVisible($query)
+    {
+        return $query->where('visibility', 'public');
+    }
+
+    public function scopePrivatePreorder($query)
+    {
+        return $query->where('visibility', 'private_preorder');
     }
 
     public function scopeFeatured($query)
