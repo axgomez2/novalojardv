@@ -23,6 +23,14 @@ Route::get('/test', function () {
     ]);
 });
 
+// Banners da home (públicos — apenas ativos)
+Route::get('/home-banners', function () {
+    $banners = \App\Models\HomeBanner::active()->ordered()->get([
+        'id', 'title', 'subtitle', 'image_path', 'link_url', 'open_in_new_tab', 'sort_order',
+    ]);
+    return response()->json(['data' => $banners]);
+});
+
 // Configurações do site (públicas)
 Route::get('/site-settings', function () {
     return response()->json([

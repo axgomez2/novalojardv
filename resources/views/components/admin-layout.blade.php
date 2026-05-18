@@ -165,6 +165,21 @@
                         </div>
                     </div>
 
+                    <!-- Marketing -->
+                    <div class="mt-8 border-t border-gray-800 pt-4">
+                        <p class="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Marketing</p>
+                        <div class="mt-2 space-y-1">
+                            <a href="{{ route('admin.home-banners.index') }}"
+                               class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('admin.home-banners.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14"/>
+                                </svg>
+                                Banners da Home
+                            </a>
+                        </div>
+                    </div>
+
                     <!-- Música (Charts & Playlists) -->
                     <div x-data="{ open: {{ request()->routeIs('admin.music.*') ? 'true' : 'false' }} }" class="mt-8 border-t border-gray-800 pt-4">
                         <button @click="open = !open" class="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300">

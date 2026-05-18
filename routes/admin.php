@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\Auth\AdminNewPasswordController;
 use App\Http\Controllers\Admin\Auth\AdminPasswordResetLinkController;
 use App\Http\Controllers\Admin\CoverStatusController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\HomeBannerController;
 use App\Http\Controllers\Admin\DimensionController;
 use App\Http\Controllers\Admin\FinancialDashboardController;
 use App\Http\Controllers\Admin\FinancialTransactionController;
@@ -124,6 +125,16 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         // Categories (Categorias)
         Route::post('categories/ajax', [CategoryController::class, 'storeAjax'])->name('categories.ajax');
         Route::resource('categories', CategoryController::class)->except(['show']);
+
+        // Banners da Home
+        Route::prefix('home-banners')->name('home-banners.')->group(function () {
+            Route::get('/', [HomeBannerController::class, 'index'])->name('index');
+            Route::post('/', [HomeBannerController::class, 'store'])->name('store');
+            Route::post('/reorder', [HomeBannerController::class, 'reorder'])->name('reorder');
+            Route::put('/{homeBanner}', [HomeBannerController::class, 'update'])->name('update');
+            Route::post('/{homeBanner}/toggle', [HomeBannerController::class, 'toggle'])->name('toggle');
+            Route::delete('/{homeBanner}', [HomeBannerController::class, 'destroy'])->name('destroy');
+        });
 
         // Pré-vendas / Encomendas
         Route::prefix('pre-orders')->name('pre-orders.')->group(function () {

@@ -60,9 +60,21 @@ class AuthController extends Controller
         // Verificar se email não está verificado
         $requiresVerification = !$user->hasVerifiedEmail();
 
+        // Se não verificou, (re)envia o código para o usuário não ficar sem
+        if ($requiresVerification) {
+            try {
+                $this->sendVerificationCode($user);
+            } catch (\Throwable $e) {
+                \Log::warning('Falha ao reenviar código de verificação no login', [
+                    'user' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return response()->json([
             'message' => $requiresVerification 
-                ? 'Login realizado! Verifique seu e-mail para acessar todas as funcionalidades.' 
+                ? 'Login realizado! Enviamos um novo código para seu e-mail.' 
                 : 'Login realizado com sucesso!',
             'token' => $token,
             'user' => $this->formatUser($user),
