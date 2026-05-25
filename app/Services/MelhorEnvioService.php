@@ -3,26 +3,66 @@
 namespace App\Services;
 
 use App\Models\ShippingCarrier;
-use App\Models\ShippingSetting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class MelhorEnvioService
 {
     protected string $baseUrl;
     protected ?string $token;
     protected array $senderAddress;
+    protected bool $sandbox;
 
     public function __construct()
     {
-        $this->baseUrl = config('services.melhor_envio.sandbox', false)
+        $settings = $this->loadSettings();
+
+        $this->sandbox = $settings['sandbox_mode'];
+        $this->baseUrl = $this->sandbox
             ? 'https://sandbox.melhorenvio.com.br/api/v2'
             : 'https://melhorenvio.com.br/api/v2';
-        
-        $this->token = config('services.melhor_envio.token');
-        
+
+        $this->token = $settings['melhor_envio_token'];
+
         $this->senderAddress = [
-            'postal_code' => config('services.melhor_envio.sender_postal_code', '01310100'),
+            'postal_code' => $settings['sender_postal_code'],
+        ];
+    }
+
+    /**
+     * Carrega configurações priorizando a tabela `shipping_settings` (admin)
+     * e caindo para `.env` / config quando o registro não existir.
+     */
+    protected function loadSettings(): array
+    {
+        $rows = [];
+        try {
+            $rows = DB::table('shipping_settings')->pluck('value', 'key')->toArray();
+        } catch (\Throwable $e) {
+            // tabela pode não existir em ambientes sem migration; usa só config
+        }
+
+        $token = $rows['melhor_envio_token'] ?? null;
+        if (!$token) {
+            $token = config('services.melhor_envio.token');
+        }
+
+        $senderCep = $rows['sender_postal_code'] ?? null;
+        if (!$senderCep) {
+            $senderCep = config('services.melhor_envio.sender_postal_code', '01310100');
+        }
+
+        if (array_key_exists('sandbox_mode', $rows)) {
+            $sandbox = filter_var($rows['sandbox_mode'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            $sandbox = (bool) config('services.melhor_envio.sandbox', true);
+        }
+
+        return [
+            'melhor_envio_token' => $token,
+            'sender_postal_code' => $senderCep,
+            'sandbox_mode' => $sandbox,
         ];
     }
 
