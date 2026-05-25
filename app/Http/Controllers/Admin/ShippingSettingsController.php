@@ -30,25 +30,29 @@ class ShippingSettingsController extends Controller
      */
     public function updateSettings(Request $request)
     {
-        $fields = [
+        // Campos booleanos: precisam ser sempre persistidos (checkbox não enviado = false)
+        $booleanFields = ['sandbox_mode'];
+
+        // Campos texto: só atualizam quando enviados
+        $textFields = [
             'sender_postal_code',
             'melhor_envio_token',
-            'sandbox_mode',
             'preorder_additional_days',
             'preorder_message',
         ];
 
-        foreach ($fields as $field) {
-            if ($request->has($field)) {
-                $value = $request->input($field);
-                
-                if ($field === 'sandbox_mode') {
-                    $value = $request->boolean('sandbox_mode') ? '1' : '0';
-                }
+        foreach ($booleanFields as $field) {
+            DB::table('shipping_settings')->updateOrInsert(
+                ['key' => $field],
+                ['value' => $request->boolean($field) ? '1' : '0', 'updated_at' => now()]
+            );
+        }
 
+        foreach ($textFields as $field) {
+            if ($request->has($field)) {
                 DB::table('shipping_settings')->updateOrInsert(
                     ['key' => $field],
-                    ['value' => $value, 'updated_at' => now()]
+                    ['value' => $request->input($field), 'updated_at' => now()]
                 );
             }
         }

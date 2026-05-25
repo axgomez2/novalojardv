@@ -35,7 +35,7 @@
             </div>
             <div class="flex items-center gap-4">
                 <label class="flex items-center gap-2">
-                    <input type="checkbox" name="sandbox_mode" value="1" {{ ($settings['sandbox_mode'] ?? true) ? 'checked' : '' }}
+                    <input type="checkbox" name="sandbox_mode" value="1" {{ filter_var($settings['sandbox_mode'] ?? true, FILTER_VALIDATE_BOOLEAN) ? 'checked' : '' }}
                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                     <span class="text-sm text-gray-700">Modo Sandbox (testes)</span>
                 </label>
