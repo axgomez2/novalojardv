@@ -1,12 +1,33 @@
 <x-admin-layout>
-    <div class="mb-8">
+    <div class="mb-8 flex items-center justify-between">
         <a href="{{ route('admin.clients.index') }}" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
             Voltar para Clientes
         </a>
+
+        @if(!$client->orders()->exists())
+            <form method="POST" action="{{ route('admin.clients.destroy', $client) }}"
+                  onsubmit="return confirm('Excluir definitivamente o cliente {{ addslashes($client->name) }}?');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/>
+                    </svg>
+                    Excluir cliente
+                </button>
+            </form>
+        @endif
     </div>
+
+    @if(session('success'))
+        <div class="mb-6 rounded-lg bg-green-50 p-4 text-green-800">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+        <div class="mb-6 rounded-lg bg-red-50 p-4 text-red-800">{{ session('error') }}</div>
+    @endif
 
     <div class="grid gap-6 lg:grid-cols-3">
         <!-- Info do Cliente -->
@@ -140,6 +161,158 @@
                     <div class="px-6 py-8 text-center text-gray-500">
                         Este cliente ainda não fez nenhum pedido.
                     </div>
+                @endif
+            </div>
+
+            <!-- Carrinho atual -->
+            <div class="mt-6 rounded-lg bg-white shadow">
+                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">Carrinho atual</h2>
+                        <p class="text-xs text-gray-500">
+                            {{ $client->cart?->items?->count() ?? 0 }} item(ns) ·
+                            Subtotal: R$ {{ number_format($client->cart?->subtotal ?? 0, 2, ',', '.') }}
+                        </p>
+                    </div>
+                    @if($client->cart && $client->cart->items->isNotEmpty())
+                        <form method="POST" action="{{ route('admin.clients.cart-to-pdv', $client) }}"
+                              onsubmit="return confirm('Criar um novo pedido (PDV) com os {{ $client->cart->items->count() }} item(ns) do carrinho?');">
+                            @csrf
+                            <button type="submit"
+                                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+                                </svg>
+                                Exportar para PDV
+                            </button>
+                        </form>
+                    @endif
+                </div>
+
+                @if($client->cart && $client->cart->items->isNotEmpty())
+                    <div class="divide-y divide-gray-200">
+                        @foreach($client->cart->items as $item)
+                            @php
+                                $stock = $item->vinylStock;
+                                $master = $stock?->vinylMaster;
+                                $img = $master?->vinylImages?->first()?->url;
+                                $artist = $master?->mainArtists?->pluck('name')->join(', ');
+                            @endphp
+                            <div class="flex items-center gap-4 px-6 py-3">
+                                @if($img)
+                                    <img src="{{ $img }}" alt="" class="h-12 w-12 rounded object-cover">
+                                @else
+                                    <div class="h-12 w-12 rounded bg-gray-200"></div>
+                                @endif
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-medium text-gray-900">{{ $master?->title ?? 'Sem título' }}</p>
+                                    <p class="truncate text-xs text-gray-500">{{ $artist ?: '—' }}</p>
+                                </div>
+                                <div class="text-right text-sm">
+                                    <p class="text-gray-900">{{ $item->quantity }}× R$ {{ number_format($item->unit_price, 2, ',', '.') }}</p>
+                                    <p class="text-xs text-gray-500">Estoque: {{ $stock?->stock ?? 0 }}</p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="px-6 py-8 text-center text-gray-500">Carrinho vazio.</div>
+                @endif
+            </div>
+
+            <!-- Wishlist -->
+            <div class="mt-6 rounded-lg bg-white shadow">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-900">Wishlist (Favoritos)</h2>
+                    <p class="text-xs text-gray-500">{{ $client->wishlists->count() }} item(ns)</p>
+                </div>
+                @if($client->wishlists->isNotEmpty())
+                    <div class="divide-y divide-gray-200">
+                        @foreach($client->wishlists as $wish)
+                            @php
+                                $stock = $wish->vinylStock;
+                                $master = $stock?->vinylMaster;
+                                $img = $master?->vinylImages?->first()?->url;
+                                $artist = $master?->mainArtists?->pluck('name')->join(', ');
+                            @endphp
+                            <div class="flex items-center gap-4 px-6 py-3">
+                                @if($img)
+                                    <img src="{{ $img }}" alt="" class="h-12 w-12 rounded object-cover">
+                                @else
+                                    <div class="h-12 w-12 rounded bg-gray-200"></div>
+                                @endif
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-medium text-gray-900">{{ $master?->title ?? '—' }}</p>
+                                    <p class="truncate text-xs text-gray-500">{{ $artist ?: '—' }}</p>
+                                </div>
+                                <div class="text-right text-sm text-gray-600">
+                                    R$ {{ number_format($stock?->current_price ?? 0, 2, ',', '.') }}
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="px-6 py-8 text-center text-gray-500">Wishlist vazia.</div>
+                @endif
+            </div>
+
+            <!-- Wantlist -->
+            <div class="mt-6 rounded-lg bg-white shadow">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-900">Wantlist (lista de procura)</h2>
+                    <p class="text-xs text-gray-500">{{ $client->wantlists->count() }} item(ns)</p>
+                </div>
+                @if($client->wantlists->isNotEmpty())
+                    <div class="divide-y divide-gray-200">
+                        @foreach($client->wantlists as $want)
+                            <div class="flex items-center gap-4 px-6 py-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-medium text-gray-900">{{ $want->display_name }}</p>
+                                    @if($want->description)
+                                        <p class="truncate text-xs text-gray-500">{{ $want->description }}</p>
+                                    @endif
+                                </div>
+                                <div class="text-right text-sm">
+                                    <span class="inline-flex rounded-full bg-{{ $want->priority_color }}-100 px-2 py-1 text-xs font-semibold text-{{ $want->priority_color }}-800">
+                                        {{ $want->priority_label }}
+                                    </span>
+                                    @if($want->max_price)
+                                        <p class="mt-1 text-xs text-gray-500">Máx: R$ {{ number_format($want->max_price, 2, ',', '.') }}</p>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="px-6 py-8 text-center text-gray-500">Wantlist vazia.</div>
+                @endif
+            </div>
+
+            <!-- Endereços -->
+            <div class="mt-6 rounded-lg bg-white shadow">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-900">Endereços</h2>
+                    <p class="text-xs text-gray-500">{{ $client->addresses->count() }} cadastrado(s)</p>
+                </div>
+                @if($client->addresses->isNotEmpty())
+                    <div class="divide-y divide-gray-200">
+                        @foreach($client->addresses as $addr)
+                            <div class="px-6 py-3 text-sm text-gray-700">
+                                <p class="font-medium">
+                                    {{ $addr->street }}, {{ $addr->number }}
+                                    @if($addr->complement) — {{ $addr->complement }} @endif
+                                    @if($addr->is_default)
+                                        <span class="ml-2 inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">Padrão</span>
+                                    @endif
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    {{ $addr->neighborhood }} · {{ $addr->city }}/{{ $addr->state }} · CEP {{ $addr->zip_code }}
+                                </p>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="px-6 py-8 text-center text-gray-500">Nenhum endereço cadastrado.</div>
                 @endif
             </div>
         </div>

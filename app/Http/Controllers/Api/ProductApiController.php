@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\ProductType;
 use App\Models\VinylStock;
 use App\Support\VinylApiFormatter;
@@ -114,8 +115,50 @@ class ProductApiController extends Controller
             $query->where('stock', '>', 0);
         }
 
+        // Snapshot do query ANTES do filtro de categoria — usado para montar as facetas
+        // (assim os contadores não sumirem ao selecionar uma categoria)
+        $facetQuery = (clone $query);
+
+        // Filtro por categoria (slug) — aceita múltiplos separados por vírgula
+        $categoryParam = $request->get('category');
+        $selectedCategorySlugs = [];
+        if ($categoryParam) {
+            $selectedCategorySlugs = collect(explode(',', $categoryParam))
+                ->map(fn ($s) => trim($s))
+                ->filter()
+                ->values()
+                ->all();
+
+            if (!empty($selectedCategorySlugs)) {
+                $query->whereHas('categories', function ($q) use ($selectedCategorySlugs) {
+                    $q->whereIn('categories.slug', $selectedCategorySlugs);
+                });
+            }
+        }
+
         $query->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
             ->orderBy('created_at', 'desc');
+
+        // Monta lista de categorias (facetas) com contagem de itens no contexto do tipo+availability
+        $categoriesFacet = Category::query()
+            ->where('is_active', true)
+            ->whereHas('vinylStocks', function ($q) use ($facetQuery) {
+                $q->whereIn('vinyl_stocks.id', (clone $facetQuery)->select('vinyl_stocks.id'));
+            })
+            ->withCount(['vinylStocks as items_count' => function ($q) use ($facetQuery) {
+                $q->whereIn('vinyl_stocks.id', (clone $facetQuery)->select('vinyl_stocks.id'));
+            }])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'parent_id'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'slug' => $c->slug,
+                'parent_id' => $c->parent_id,
+                'count' => (int) $c->items_count,
+            ])
+            ->values();
 
         // Modo "limit" (para vitrine/home) — traz N últimos sem paginar
         if ($request->filled('limit')) {
@@ -134,6 +177,8 @@ class ProductApiController extends Controller
                         'name' => $type->name,
                         'slug' => $type->slug,
                     ],
+                    'categories' => $categoriesFacet,
+                    'selected_categories' => $selectedCategorySlugs,
                 ],
             ]);
         }
@@ -157,6 +202,8 @@ class ProductApiController extends Controller
                     'name' => $type->name,
                     'slug' => $type->slug,
                 ],
+                'categories' => $categoriesFacet,
+                'selected_categories' => $selectedCategorySlugs,
             ],
         ]);
     }

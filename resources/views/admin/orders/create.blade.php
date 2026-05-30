@@ -14,7 +14,17 @@
         <div class="mb-6 rounded-lg bg-red-50 p-4 text-red-800">{{ session('error') }}</div>
     @endif
 
-    <form method="POST" action="{{ route('admin.orders.store') }}" x-data="pdvForm()" @submit.prevent="submitForm">
+    @php($pdvPrefill = session('pdv_prefill'))
+    @if($pdvPrefill)
+        <script>
+            window.__pdvPrefill = @json($pdvPrefill);
+        </script>
+        <div class="mb-6 rounded-lg bg-indigo-50 p-4 text-indigo-800 text-sm">
+            Carrinho de <strong>{{ $pdvPrefill['client']['name'] ?? '' }}</strong> importado com {{ count($pdvPrefill['items'] ?? []) }} item(ns). Revise e finalize o pedido.
+        </div>
+    @endif
+
+    <form method="POST" action="{{ route('admin.orders.store') }}" x-data="pdvForm()" x-init="init()" @submit.prevent="submitForm">
         @csrf
         <div class="grid gap-6 lg:grid-cols-3">
             <!-- Coluna Principal -->
@@ -329,6 +339,35 @@
                 discount: 0,
                 paymentMethod: '',
                 paymentStatus: 'paid',
+
+                init() {
+                    // Pré-preencher a partir do carrinho exportado de um cliente
+                    const prefill = window.__pdvPrefill;
+                    if (prefill) {
+                        this.clientType = 'registered';
+                        if (prefill.client) {
+                            this.selectedClient = {
+                                id: prefill.client.id,
+                                name: prefill.client.name,
+                                email: prefill.client.email,
+                                phone: prefill.client.phone || '',
+                            };
+                        }
+                        if (Array.isArray(prefill.items)) {
+                            this.items = prefill.items.map(p => ({
+                                id: p.id,
+                                title: p.title,
+                                artist: p.artist || '',
+                                price: parseFloat(p.price) || 0,
+                                stock: parseInt(p.stock) || 0,
+                                image: p.image || null,
+                                quantity: parseInt(p.quantity) || 1,
+                            }));
+                        }
+                        // Limpa para evitar reaplicar em reload
+                        delete window.__pdvPrefill;
+                    }
+                },
 
                 get subtotal() {
                     return this.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);

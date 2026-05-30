@@ -247,10 +247,12 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         // Clientes (ClientUsers)
         Route::prefix('clients')->name('clients.')->group(function () {
             Route::get('/', [ClientController::class, 'index'])->name('index');
+            Route::get('/ajax/search-djs', [ClientController::class, 'searchDjs'])->name('search-djs');
             Route::get('/{client}', [ClientController::class, 'show'])->name('show');
+            Route::delete('/{client}', [ClientController::class, 'destroy'])->name('destroy');
+            Route::post('/{client}/cart-to-pdv', [ClientController::class, 'exportCartToPdv'])->name('cart-to-pdv');
             Route::patch('/{client}/toggle-dj', [ClientController::class, 'toggleDj'])->name('toggle-dj');
             Route::patch('/{client}/toggle-active', [ClientController::class, 'toggleActive'])->name('toggle-active');
-            Route::get('/ajax/search-djs', [ClientController::class, 'searchDjs'])->name('search-djs');
         });
 
         // Pedidos (Orders)
@@ -264,6 +266,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::get('/{order}/invoice/download', [OrderController::class, 'downloadInvoice'])->name('download-invoice');
             Route::post('/{order}/note', [OrderController::class, 'addNote'])->name('add-note');
             Route::post('/{order}/resend-notification', [OrderController::class, 'resendNotification'])->name('resend-notification');
+            Route::post('/{order}/clear-client-cart', [OrderController::class, 'clearClientCart'])->name('clear-client-cart');
             
             // AJAX endpoints
             Route::get('/ajax/search-clients', [OrderController::class, 'searchClients'])->name('search-clients');

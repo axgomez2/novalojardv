@@ -88,7 +88,7 @@ class OrderController extends Controller
     public function show(ClientOrder $order)
     {
         $order->load([
-            'clientUser',
+            'clientUser.cart.items',
             'shippingAddress',
             'billingAddress',
             'items.vinylStock.vinylMaster.mainArtists',
@@ -100,7 +100,44 @@ class OrderController extends Controller
             'createdBy',
         ]);
 
-        return view('admin.orders.show', compact('order'));
+        // Calcula quantos itens do carrinho do cliente correspondem aos do pedido
+        $matchingCartItems = 0;
+        if ($order->clientUser && $order->clientUser->cart) {
+            $orderStockIds = $order->items->pluck('vinyl_stock_id')->all();
+            $matchingCartItems = $order->clientUser->cart->items
+                ->whereIn('vinyl_stock_id', $orderStockIds)
+                ->count();
+        }
+
+        return view('admin.orders.show', compact('order', 'matchingCartItems'));
+    }
+
+    /**
+     * Limpa do carrinho do cliente os itens que correspondem a este pedido.
+     * Útil após criar um pedido via PDV a partir do carrinho do cliente,
+     * evitando que o cliente fique com itens "fantasma" (esgotados).
+     */
+    public function clearClientCart(ClientOrder $order)
+    {
+        if (!$order->client_user_id) {
+            return back()->with('error', 'Este pedido não está vinculado a um cliente cadastrado.');
+        }
+
+        $client = $order->clientUser;
+        if (!$client || !$client->cart) {
+            return back()->with('error', 'Cliente não possui carrinho ativo.');
+        }
+
+        $orderStockIds = $order->items->pluck('vinyl_stock_id')->all();
+        $removed = $client->cart->items()
+            ->whereIn('vinyl_stock_id', $orderStockIds)
+            ->delete();
+
+        if ($removed === 0) {
+            return back()->with('error', 'Nenhum item correspondente foi encontrado no carrinho do cliente.');
+        }
+
+        return back()->with('success', "Removidos {$removed} item(ns) do carrinho do cliente.");
     }
 
     /**

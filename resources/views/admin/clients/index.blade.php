@@ -12,6 +12,12 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="mb-6 rounded-lg bg-red-50 p-4 text-red-800">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <!-- Filters -->
     <div class="mb-6 rounded-lg bg-white p-4 shadow">
         <form method="GET" action="{{ route('admin.clients.index') }}" class="flex flex-wrap gap-4">
@@ -155,6 +161,20 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
                                         @endif
+                                    </button>
+                                </form>
+                                <form method="POST"
+                                      action="{{ route('admin.clients.destroy', $client) }}"
+                                      class="inline"
+                                      onsubmit="return confirm('Tem certeza que deseja EXCLUIR o cliente {{ addslashes($client->name) }}? Esta ação não pode ser desfeita.');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="text-red-600 hover:text-red-900"
+                                            title="Excluir cliente">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/>
+                                        </svg>
                                     </button>
                                 </form>
                             </div>

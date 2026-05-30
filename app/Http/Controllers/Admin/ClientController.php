@@ -35,8 +35,70 @@ class ClientController extends Controller
 
     public function show(ClientUser $client)
     {
-        $client->load(['orders', 'djPlaylist']);
+        $client->load([
+            'orders' => fn ($q) => $q->orderByDesc('created_at'),
+            'djPlaylist',
+            'addresses',
+            'cart.items.vinylStock.vinylMaster.mainArtists',
+            'cart.items.vinylStock.vinylMaster.vinylImages',
+            'wishlists.vinylStock.vinylMaster.mainArtists',
+            'wishlists.vinylStock.vinylMaster.vinylImages',
+            'wantlists.vinylMaster.mainArtists',
+        ]);
+
         return view('admin.clients.show', compact('client'));
+    }
+
+    public function destroy(ClientUser $client)
+    {
+        // Bloquear exclusão se houver pedidos vinculados (preserva histórico)
+        if ($client->orders()->exists()) {
+            return back()->with('error', 'Não é possível excluir: cliente possui pedidos. Desative-o em vez disso.');
+        }
+
+        $name = $client->name;
+        $client->delete();
+
+        return redirect()->route('admin.clients.index')
+            ->with('success', "Cliente {$name} excluído com sucesso.");
+    }
+
+    /**
+     * Exportar carrinho do cliente para o PDV (pré-preenche o formulário de novo pedido)
+     */
+    public function exportCartToPdv(ClientUser $client)
+    {
+        $client->load('cart.items.vinylStock.vinylMaster.mainArtists', 'cart.items.vinylStock.vinylMaster.vinylImages');
+
+        if (!$client->cart || $client->cart->items->isEmpty()) {
+            return back()->with('error', 'O carrinho deste cliente está vazio.');
+        }
+
+        $items = $client->cart->items->map(function ($item) {
+            $stock = $item->vinylStock;
+            $master = $stock?->vinylMaster;
+            return [
+                'id' => $stock->id,
+                'title' => $master?->title ?? 'Sem título',
+                'artist' => $master?->mainArtists?->pluck('name')->join(', ') ?? '',
+                'price' => (float) $stock->current_price,
+                'stock' => (int) $stock->stock,
+                'image' => $master?->vinylImages?->first()?->url ?? null,
+                'quantity' => max(1, min((int) $item->quantity, (int) $stock->stock ?: 1)),
+            ];
+        })->values()->toArray();
+
+        session()->flash('pdv_prefill', [
+            'client' => [
+                'id' => $client->id,
+                'name' => $client->name,
+                'email' => $client->email,
+                'phone' => $client->formatted_phone ?? $client->phone,
+            ],
+            'items' => $items,
+        ]);
+
+        return redirect()->route('admin.orders.create');
     }
 
     public function toggleDj(ClientUser $client)

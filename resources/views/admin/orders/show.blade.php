@@ -99,6 +99,37 @@
                 </div>
             </div>
 
+            <!-- Carrinho do Cliente (sincronização) -->
+            @if($order->client_user_id && $matchingCartItems > 0)
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-6">
+                    <div class="flex items-start gap-3">
+                        <svg class="h-6 w-6 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div class="flex-1">
+                            <h3 class="text-sm font-semibold text-amber-900">Atenção: itens duplicados no carrinho do cliente</h3>
+                            <p class="mt-1 text-sm text-amber-800">
+                                O cliente <strong>{{ $order->clientUser->name }}</strong> ainda tem
+                                <strong>{{ $matchingCartItems }}</strong> item(ns) no carrinho que correspondem a este pedido.
+                                Como o estoque já foi decrementado ao gerar este pedido, esses itens ficarão "fantasma"
+                                (esgotados) no carrinho dele se não forem removidos.
+                            </p>
+                            <form method="POST" action="{{ route('admin.orders.clear-client-cart', $order) }}" class="mt-4"
+                                  onsubmit="return confirm('Remover do carrinho do cliente os itens já incluídos neste pedido?');">
+                                @csrf
+                                <button type="submit"
+                                        class="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/>
+                                    </svg>
+                                    Limpar carrinho do cliente
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Atualizar Status -->
             <div class="rounded-lg bg-white p-6 shadow">
                 <h2 class="mb-4 text-lg font-semibold text-gray-900">Atualizar Status</h2>
