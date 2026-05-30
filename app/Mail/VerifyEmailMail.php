@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\SiteSetting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -17,6 +18,8 @@ class VerifyEmailMail extends Mailable
     public string $code;
     public string $verifyUrl;
     public string $userName;
+    public ?string $logoUrl;
+    public string $siteName;
 
     public function __construct(string $code, string $userName)
     {
@@ -25,6 +28,14 @@ class VerifyEmailMail extends Mailable
 
         $frontend = rtrim(config('app.frontend_url', env('FRONTEND_URL', config('app.url'))), '/');
         $this->verifyUrl = $frontend . '/verify-email?code=' . urlencode($code);
+
+        // Logo do site (transformar em URL absoluta para clientes de email)
+        $logo = SiteSetting::get('logo');
+        if ($logo && !preg_match('#^https?://#i', $logo)) {
+            $logo = rtrim(config('app.url'), '/') . '/' . ltrim($logo, '/');
+        }
+        $this->logoUrl = $logo ?: null;
+        $this->siteName = SiteSetting::get('site_name', 'RDV Discos');
     }
 
     public function envelope(): Envelope
@@ -42,6 +53,8 @@ class VerifyEmailMail extends Mailable
                 'code' => $this->code,
                 'verifyUrl' => $this->verifyUrl,
                 'userName' => $this->userName,
+                'logoUrl' => $this->logoUrl,
+                'siteName' => $this->siteName,
             ],
         );
     }

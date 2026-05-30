@@ -14,18 +14,11 @@
                     <!-- Header -->
                     <tr>
                         <td style="padding: 32px 40px 16px; text-align: center; border-bottom: 1px solid #f5f5f4;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" align="center">
-                                <tr>
-                                    <td style="vertical-align: middle; padding-right: 12px;">
-                                        <div style="width: 44px; height: 44px; background-color: #facc15; border-radius: 50%; text-align: center; line-height: 44px; font-size: 22px;">
-                                            🎵
-                                        </div>
-                                    </td>
-                                    <td style="vertical-align: middle;">
-                                        <span style="font-size: 24px; font-weight: 700; color: #1c1917; letter-spacing: -0.02em;">RDV Discos</span>
-                                    </td>
-                                </tr>
-                            </table>
+                            @if(!empty($logoUrl))
+                                <img src="{{ $logoUrl }}" alt="{{ $siteName }}" style="max-height: 60px; max-width: 220px; height: auto; width: auto; display: inline-block;" />
+                            @else
+                                <span style="font-size: 24px; font-weight: 700; color: #1c1917; letter-spacing: -0.02em;">{{ $siteName }}</span>
+                            @endif
                         </td>
                     </tr>
 
