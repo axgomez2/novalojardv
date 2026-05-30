@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\VerifyEmailMail;
 use App\Models\ClientUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -208,18 +210,21 @@ class AuthController extends Controller
     {
         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $cacheKey = 'email_verification_' . $user->id;
-        
+
         // Armazenar código por 30 minutos
         Cache::put($cacheKey, $code, now()->addMinutes(30));
 
-        // Enviar email
-        Mail::send('emails.verify-email', [
-            'user' => $user,
-            'code' => $code,
-        ], function ($message) use ($user) {
-            $message->to($user->email, $user->name)
-                ->subject('Verifique seu e-mail - Vinil Store');
-        });
+        // Enviar email (não quebra o fluxo se SMTP falhar; logamos a falha)
+        try {
+            Mail::to($user->email, $user->name)
+                ->send(new VerifyEmailMail($code, $user->name));
+        } catch (\Throwable $e) {
+            Log::error('Falha ao enviar email de verificação', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
