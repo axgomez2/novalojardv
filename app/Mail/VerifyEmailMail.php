@@ -3,13 +3,14 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class VerifyEmailMail extends Mailable implements ShouldQueue
+// Observação: NÃO implementa ShouldQueue de propósito — envio síncrono
+// para funcionar mesmo sem queue worker em produção.
+class VerifyEmailMail extends Mailable
 {
     use Queueable, SerializesModels;
 
