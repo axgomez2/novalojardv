@@ -382,7 +382,7 @@ Route::prefix('vinyls')->group(function () {
 
     // Listagem geral com filtros, incluindo sem estoque
     Route::get('/', function () {
-        $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel'])
+        $query = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.vinylImages'])
             ->where('visibility', 'public')
             ->where('availability', '!=', 'unavailable');
 
@@ -425,7 +425,7 @@ Route::get('/search', function () {
     
     $searchTerms = '%' . $query . '%';
     
-    $results = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+    $results = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks', 'vinylMaster.vinylImages'])
         ->where('visibility', 'public')
         ->where('availability', '!=', 'unavailable')
         ->where(function ($q) use ($searchTerms) {

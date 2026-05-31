@@ -93,6 +93,7 @@ class ProductApiController extends Controller
                 'vinylMaster.mainArtists',
                 'vinylMaster.recordLabel',
                 'vinylMaster.tracks',
+                'vinylMaster.vinylImages',
                 'productType',
             ])
             ->where('product_type_id', $type->id);

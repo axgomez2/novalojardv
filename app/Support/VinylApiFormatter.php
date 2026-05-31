@@ -72,7 +72,7 @@ class VinylApiFormatter
                 'logo' => $master->recordLabel->logo,
             ] : null,
             'release_year' => $master?->release_year,
-            'cover_image' => $master?->cover_url ?? '/images/vinyl-placeholder.jpg',
+            'cover_image' => self::resolveCoverImage($master),
             'price' => $stock->current_price,
             'formatted_price' => $stock->formatted_current_price,
             'original_price' => $stock->is_promotional ? $stock->sell_price : null,
@@ -117,7 +117,7 @@ class VinylApiFormatter
             $data['notes'] = $stock->notes;
             $data['vinyl_master_id'] = $master?->id;
             $data['images'] = $master?->vinylImages?->map(fn ($img) => [
-                'url' => $img->url,
+                'url' => $img->full_url,
                 'is_primary' => $img->is_primary,
             ]) ?? [];
 
@@ -136,5 +136,34 @@ class VinylApiFormatter
         }
 
         return $data;
+    }
+
+    /**
+     * Resolve a imagem de capa correta:
+     * 1. Imagem local definida como principal (is_primary)
+     * 2. Primeira imagem local cadastrada
+     * 3. cover_url do Discogs (fallback)
+     * 4. Placeholder genérico
+     */
+    private static function resolveCoverImage(?\App\Models\VinylMaster $master): string
+    {
+        if (!$master) {
+            return '/images/vinyl-placeholder.jpg';
+        }
+
+        // 1. Imagem local definida como principal
+        $primary = $master->vinylImages->first(fn ($img) => $img->is_primary);
+        if ($primary) {
+            return $primary->full_url;
+        }
+
+        // 2. Primeira imagem local cadastrada (qualquer uma)
+        $firstLocal = $master->vinylImages->first();
+        if ($firstLocal) {
+            return $firstLocal->full_url;
+        }
+
+        // 3. Fallback para Discogs
+        return $master->cover_url ?? '/images/vinyl-placeholder.jpg';
     }
 }
