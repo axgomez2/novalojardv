@@ -503,6 +503,16 @@ Route::get('/acessorios', [App\Http\Controllers\Api\ProductApiController::class,
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth:sanctum')->group(function () {
+    // Carrinho persistente
+    Route::prefix('cart')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\CartController::class, 'index']);
+        Route::post('/items', [App\Http\Controllers\Api\CartController::class, 'storeItem']);
+        Route::patch('/items/{vinylStockId}', [App\Http\Controllers\Api\CartController::class, 'updateItem']);
+        Route::delete('/items/{vinylStockId}', [App\Http\Controllers\Api\CartController::class, 'destroyItem']);
+        Route::post('/sync', [App\Http\Controllers\Api\CartController::class, 'sync']);
+        Route::delete('/', [App\Http\Controllers\Api\CartController::class, 'clear']);
+    });
+
     // Wishlist
     Route::prefix('wishlist')->group(function () {
         Route::get('/', [App\Http\Controllers\Api\WishlistController::class, 'index']);
