@@ -4,6 +4,30 @@
             <h1 class="text-2xl font-bold text-gray-900">Configurações de Frete</h1>
             <p class="mt-1 text-sm text-gray-600">Gerencie transportadoras, acréscimos e prazos de entrega</p>
         </div>
+
+    </div>
+
+    @if (session('success'))
+        <div class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            {{ session('success') }}
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {{ session('error') }}
+        </div>
+    @endif
+    @if ($errors->any())
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <ul class="list-disc pl-5">
+                @foreach ($errors->all() as $e)
+                    <li>{{ $e }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="mb-6 flex justify-end">
         <button type="button" onclick="syncCarriers()" id="syncBtn"
            class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,6 +72,13 @@
         </form>
     </div>
 
+    {{-- Forms de cada transportadora (fora da tabela para HTML válido) --}}
+    @foreach ($carriers as $carrier)
+        <form method="POST" action="{{ route('admin.settings.shipping.update-carrier', $carrier) }}" id="carrier-form-{{ $carrier->id }}">
+            @csrf
+        </form>
+    @endforeach
+
     <!-- Transportadoras -->
     <div class="rounded-lg bg-white shadow">
         <div class="border-b border-gray-200 px-6 py-4">
@@ -58,23 +89,23 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ativo</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Transportadora</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Empresa</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Acréscimo (R$)</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Acréscimo (%)</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Dias Extras</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ordem</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Ações</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ativo</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Transportadora</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Empresa</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Acréscimo (R$)</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Acréscimo (%)</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Dias Extras</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ordem</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Salvar</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 bg-white">
                     @forelse ($carriers as $carrier)
                         <tr>
-                            <td class="px-6 py-4">
+                            <td class="px-4 py-4 align-middle">
                                 <form method="POST" action="{{ route('admin.settings.shipping.toggle-carrier', $carrier) }}" class="inline">
                                     @csrf
-                                    <button type="submit" class="focus:outline-none">
+                                    <button type="submit" class="focus:outline-none" title="{{ $carrier->is_active ? 'Desativar' : 'Ativar' }}">
                                         @if ($carrier->is_active)
                                             <span class="inline-flex h-6 w-11 items-center rounded-full bg-indigo-600">
                                                 <span class="ml-5 h-5 w-5 rounded-full bg-white shadow"></span>
@@ -87,69 +118,47 @@
                                     </button>
                                 </form>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 py-4 align-middle">
                                 <div class="flex items-center gap-3">
                                     @if($carrier->logo)
                                         <img src="{{ $carrier->logo }}" alt="{{ $carrier->name }}" class="h-8 w-8 object-contain">
                                     @endif
-                                    <span class="text-sm font-medium text-gray-900">{{ $carrier->name }}</span>
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900">{{ $carrier->name }}</div>
+                                        <div class="text-xs text-gray-400">ID: {{ $carrier->melhor_envio_id }}</div>
+                                    </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">{{ $carrier->company }}</td>
-                            <td class="px-6 py-4">
-                                <form method="POST" action="{{ route('admin.settings.shipping.update-carrier', $carrier) }}" class="inline-flex items-center gap-1">
-                                    @csrf
-                                    <input type="number" name="additional_cost" value="{{ $carrier->additional_cost }}" step="0.01" min="0"
-                                           class="w-20 rounded border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <input type="hidden" name="field" value="additional_cost">
-                                    <button type="submit" class="text-indigo-600 hover:text-indigo-900">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                        </svg>
-                                    </button>
-                                </form>
+                            <td class="px-4 py-4 align-middle text-sm text-gray-500">{{ $carrier->company }}</td>
+
+                            <td class="px-4 py-4 align-middle">
+                                <input form="carrier-form-{{ $carrier->id }}" type="number" name="additional_cost"
+                                       value="{{ $carrier->additional_cost }}" step="0.01" min="0"
+                                       class="w-24 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </td>
-                            <td class="px-6 py-4">
-                                <form method="POST" action="{{ route('admin.settings.shipping.update-carrier', $carrier) }}" class="inline-flex items-center gap-1">
-                                    @csrf
-                                    <input type="number" name="additional_percentage" value="{{ $carrier->additional_percentage }}" step="0.1" min="0"
-                                           class="w-20 rounded border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <input type="hidden" name="field" value="additional_percentage">
-                                    <button type="submit" class="text-indigo-600 hover:text-indigo-900">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                        </svg>
-                                    </button>
-                                </form>
+                            <td class="px-4 py-4 align-middle">
+                                <input form="carrier-form-{{ $carrier->id }}" type="number" name="additional_percentage"
+                                       value="{{ $carrier->additional_percentage }}" step="0.1" min="0"
+                                       class="w-24 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </td>
-                            <td class="px-6 py-4">
-                                <form method="POST" action="{{ route('admin.settings.shipping.update-carrier', $carrier) }}" class="inline-flex items-center gap-1">
-                                    @csrf
-                                    <input type="number" name="additional_days" value="{{ $carrier->additional_days }}" min="0"
-                                           class="w-16 rounded border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <input type="hidden" name="field" value="additional_days">
-                                    <button type="submit" class="text-indigo-600 hover:text-indigo-900">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                        </svg>
-                                    </button>
-                                </form>
+                            <td class="px-4 py-4 align-middle">
+                                <input form="carrier-form-{{ $carrier->id }}" type="number" name="additional_days"
+                                       value="{{ $carrier->additional_days }}" min="0"
+                                       class="w-20 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </td>
-                            <td class="px-6 py-4">
-                                <form method="POST" action="{{ route('admin.settings.shipping.update-carrier', $carrier) }}" class="inline-flex items-center gap-1">
-                                    @csrf
-                                    <input type="number" name="sort_order" value="{{ $carrier->sort_order }}" min="0"
-                                           class="w-16 rounded border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <input type="hidden" name="field" value="sort_order">
-                                    <button type="submit" class="text-indigo-600 hover:text-indigo-900">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                        </svg>
-                                    </button>
-                                </form>
+                            <td class="px-4 py-4 align-middle">
+                                <input form="carrier-form-{{ $carrier->id }}" type="number" name="sort_order"
+                                       value="{{ $carrier->sort_order }}" min="0"
+                                       class="w-20 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </td>
-                            <td class="px-6 py-4 text-right">
-                                <span class="text-xs text-gray-400">ID: {{ $carrier->melhor_envio_id }}</span>
+                            <td class="px-4 py-4 align-middle text-right">
+                                <button form="carrier-form-{{ $carrier->id }}" type="submit"
+                                        class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    Salvar
+                                </button>
                             </td>
                         </tr>
                     @empty

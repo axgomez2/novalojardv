@@ -114,19 +114,27 @@ class ShippingSettingsController extends Controller
      */
     public function updateCarrier(Request $request, ShippingCarrier $carrier)
     {
-        $field = $request->input('field');
-        $allowedFields = ['additional_cost', 'additional_percentage', 'additional_days', 'sort_order'];
-
-        if (!in_array($field, $allowedFields)) {
-            return redirect()->route('admin.settings.shipping.index')
-                ->with('error', 'Campo inválido.');
-        }
-
-        $carrier->update([
-            $field => $request->input($field),
+        $validated = $request->validate([
+            'additional_cost'       => 'nullable|numeric|min:0',
+            'additional_percentage' => 'nullable|numeric|min:0',
+            'additional_days'       => 'nullable|integer|min:0',
+            'sort_order'            => 'nullable|integer|min:0',
         ]);
 
+        // Filtra apenas campos efetivamente enviados (mantém compatibilidade
+        // com submissões parciais e ignora chaves vazias).
+        $payload = collect($validated)
+            ->filter(fn ($v) => $v !== null && $v !== '')
+            ->all();
+
+        if (empty($payload)) {
+            return redirect()->route('admin.settings.shipping.index')
+                ->with('error', 'Nenhum campo enviado.');
+        }
+
+        $carrier->update($payload);
+
         return redirect()->route('admin.settings.shipping.index')
-            ->with('success', 'Transportadora atualizada!');
+            ->with('success', "Transportadora {$carrier->name} atualizada!");
     }
 }
