@@ -6,6 +6,9 @@ use App\Models\ClientOrder;
 use App\Models\OrderPayment;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use MercadoPago\Client\Preference\PreferenceClient;
+use MercadoPago\Exceptions\MPApiException;
+use MercadoPago\MercadoPagoConfig;
 
 class MercadoPagoService
 {
@@ -19,10 +22,86 @@ class MercadoPagoService
         $this->accessToken = config('services.mercado_pago.access_token');
         $this->publicKey = config('services.mercado_pago.public_key');
         $this->isSandbox = config('services.mercado_pago.sandbox', true);
+
+        if ($this->accessToken) {
+            MercadoPagoConfig::setAccessToken($this->accessToken);
+        }
     }
 
     /**
-     * Criar preferência de pagamento (Checkout Pro)
+     * Monta o bloco "payer" da preferência a partir do cliente do pedido.
+     * Inclui CPF, telefone e endereço quando disponíveis (melhora taxa de aprovação).
+     */
+    protected function buildPayer(ClientOrder $order): array
+    {
+        $user = $order->clientUser;
+        $fullName = $user?->name ?? $order->guest_name ?? '';
+        $parts = explode(' ', trim($fullName), 2);
+
+        $payer = [
+            'name'    => $parts[0] ?? '',
+            'surname' => $parts[1] ?? '',
+            'email'   => $user?->email ?? $order->guest_email,
+        ];
+
+        $cpf = preg_replace('/\D/', '', (string) ($user?->cpf ?? $order->guest_cpf ?? ''));
+        if (strlen($cpf) === 11) {
+            $payer['identification'] = ['type' => 'CPF', 'number' => $cpf];
+        }
+
+        $phone = preg_replace('/\D/', '', (string) ($user?->phone ?? $order->guest_phone ?? ''));
+        if (strlen($phone) >= 10) {
+            $payer['phone'] = [
+                'area_code' => substr($phone, 0, 2),
+                'number'    => substr($phone, 2),
+            ];
+        }
+
+        $address = $order->shippingAddress;
+        if ($address) {
+            $payer['address'] = [
+                'zip_code'      => preg_replace('/\D/', '', (string) $address->zip_code),
+                'street_name'   => (string) $address->street,
+                'street_number' => (string) $address->number,
+            ];
+        }
+
+        return $payer;
+    }
+
+    /**
+     * Monta o bloco "shipments" da preferência (frete separado dos items).
+     */
+    protected function buildShipments(ClientOrder $order): ?array
+    {
+        if ((float) $order->shipping_cost <= 0) {
+            return null;
+        }
+
+        $shipments = [
+            'cost' => round((float) $order->shipping_cost, 2),
+            'mode' => 'not_specified',
+        ];
+
+        $address = $order->shippingAddress;
+        if ($address) {
+            $shipments['receiver_address'] = [
+                'zip_code'      => preg_replace('/\D/', '', (string) $address->zip_code),
+                'street_name'   => (string) $address->street,
+                'street_number' => (string) $address->number,
+                'floor'         => '',
+                'apartment'     => (string) ($address->complement ?? ''),
+                'city_name'     => (string) $address->city,
+                'state_name'    => (string) $address->state,
+                'country_name'  => 'Brasil',
+            ];
+        }
+
+        return $shipments;
+    }
+
+    /**
+     * Criar preferência de pagamento (Checkout Pro) via SDK oficial.
      */
     public function createPreference(ClientOrder $order): array
     {
@@ -33,91 +112,93 @@ class MercadoPagoService
         try {
             $items = $order->items->map(function ($item) {
                 return [
-                    'id' => (string) $item->vinyl_stock_id,
-                    'title' => $item->vinylStock?->vinylMaster?->full_title ?? 'Disco de Vinil',
-                    'description' => $item->vinylStock?->format ?? 'LP',
+                    'id'          => (string) $item->vinyl_stock_id,
+                    'title'       => $item->vinylStock?->vinylMaster?->full_title ?? 'Disco de Vinil',
+                    'description' => $item->vinylStock?->vinylMaster?->format ?? 'LP',
                     'picture_url' => $item->vinylStock?->vinylMaster?->cover_url,
                     'category_id' => 'music',
-                    'quantity' => $item->quantity,
+                    'quantity'    => (int) $item->quantity,
                     'currency_id' => 'BRL',
-                    'unit_price' => (float) $item->unit_price,
+                    'unit_price'  => round((float) $item->unit_price, 2),
                 ];
-            })->toArray();
+            })->values()->toArray();
 
-            if ($order->shipping_cost > 0) {
-                $items[] = [
-                    'id' => 'shipping',
-                    'title' => 'Frete - ' . ($order->shipping_service_name ?? 'Envio'),
-                    'category_id' => 'shipping',
-                    'quantity' => 1,
-                    'currency_id' => 'BRL',
-                    'unit_price' => (float) $order->shipping_cost,
-                ];
-            }
+            $frontendUrl = rtrim(config('app.frontend_url') ?: env('FRONTEND_URL', 'http://localhost:3000'), '/');
+            $backendUrl  = rtrim(config('app.url') ?: env('APP_URL', 'http://localhost'), '/');
 
-            $frontendUrl = config('app.frontend_url') ?: env('FRONTEND_URL', 'http://localhost:3000');
-            $backendUrl = config('app.url') ?: env('APP_URL', 'http://localhost');
-            
-            // Verifica se está em localhost (Mercado Pago não aceita auto_return com localhost)
-            $isLocalhost = str_contains($frontendUrl, 'localhost') || str_contains($frontendUrl, '127.0.0.1');
+            // Mercado Pago não aceita auto_return com URLs localhost/http
+            $isLocalhost = str_contains($frontendUrl, 'localhost')
+                || str_contains($frontendUrl, '127.0.0.1')
+                || str_starts_with($frontendUrl, 'http://');
 
-            $payload = [
-                'items' => $items,
-                'payer' => [
-                    'name' => $order->clientUser?->name ?? $order->guest_name,
-                    'email' => $order->clientUser?->email ?? $order->guest_email,
+            $request = [
+                'items'                => $items,
+                'payer'                => $this->buildPayer($order),
+                'external_reference'   => $order->order_number,
+                'statement_descriptor' => 'RDVDISCOS',
+                'payment_methods'      => [
+                    'installments'          => 12,
+                    'default_installments'  => 1,
                 ],
-                'external_reference' => $order->order_number,
-                'statement_descriptor' => 'LOJA DISCOS',
+                'metadata' => [
+                    'order_id'     => $order->id,
+                    'order_number' => $order->order_number,
+                ],
+                'expires'             => true,
+                'expiration_date_to'  => now()->addHours(24)->format('Y-m-d\TH:i:s.vP'),
             ];
 
-            // Só adiciona back_urls e auto_return se NÃO for localhost
+            // Frete no bloco shipments (não como item)
+            if ($shipments = $this->buildShipments($order)) {
+                $request['shipments'] = $shipments;
+            }
+
+            // back_urls + notification_url só quando URL pública HTTPS
             if (!$isLocalhost) {
-                $payload['back_urls'] = [
+                $request['back_urls'] = [
                     'success' => $frontendUrl . '/pedido/' . $order->order_number . '/sucesso',
                     'failure' => $frontendUrl . '/pedido/' . $order->order_number . '/erro',
                     'pending' => $frontendUrl . '/pedido/' . $order->order_number . '/pendente',
                 ];
-                $payload['auto_return'] = 'approved';
-                $payload['notification_url'] = $backendUrl . '/api/webhooks/mercadopago';
+                $request['auto_return']      = 'approved';
+                $request['notification_url'] = $backendUrl . '/api/webhooks/mercadopago';
             }
 
             Log::info('Mercado Pago - Criando preferência', [
-                'order' => $order->order_number,
-                'frontend_url' => $frontendUrl,
-                'is_localhost' => $isLocalhost,
-                'back_urls' => $payload['back_urls'] ?? 'não configurado (localhost)',
+                'order'         => $order->order_number,
+                'frontend_url'  => $frontendUrl,
+                'is_localhost'  => $isLocalhost,
+                'items_count'   => count($items),
+                'has_shipments' => isset($request['shipments']),
             ]);
 
-            $response = Http::withToken($this->accessToken)
-                ->withHeaders([
-                    'Content-Type' => 'application/json',
-                ])
-                ->post($this->baseUrl . '/checkout/preferences', $payload);
+            $client = new PreferenceClient();
+            $preference = $client->create($request);
 
-            if ($response->failed()) {
-                Log::error('Mercado Pago - Erro ao criar preferência', [
-                    'order' => $order->order_number,
-                    'response' => $response->body(),
-                ]);
-                return ['error' => 'Erro ao criar preferência de pagamento'];
-            }
-
-            $data = $response->json();
-
-            // Usa sandbox_init_point em ambiente de teste
-            $initPoint = $this->isSandbox 
-                ? ($data['sandbox_init_point'] ?? $data['init_point'])
-                : $data['init_point'];
+            $initPoint = $this->isSandbox
+                ? ($preference->sandbox_init_point ?? $preference->init_point)
+                : $preference->init_point;
 
             return [
-                'preference_id' => $data['id'],
-                'init_point' => $initPoint,
-                'sandbox_init_point' => $data['sandbox_init_point'] ?? null,
-                'is_sandbox' => $this->isSandbox,
+                'preference_id'      => $preference->id,
+                'init_point'         => $initPoint,
+                'sandbox_init_point' => $preference->sandbox_init_point ?? null,
+                'is_sandbox'         => $this->isSandbox,
             ];
-        } catch (\Exception $e) {
-            Log::error('Mercado Pago - Exceção', ['error' => $e->getMessage()]);
+        } catch (MPApiException $e) {
+            $body = method_exists($e, 'getApiResponse') ? $e->getApiResponse()->getContent() : null;
+            Log::error('Mercado Pago - Erro API ao criar preferência', [
+                'order'    => $order->order_number,
+                'status'   => $e->getApiResponse()?->getStatusCode(),
+                'response' => $body,
+                'message'  => $e->getMessage(),
+            ]);
+            return ['error' => 'Erro ao criar preferência de pagamento'];
+        } catch (\Throwable $e) {
+            Log::error('Mercado Pago - Exceção createPreference', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
             return ['error' => 'Erro ao conectar com Mercado Pago: ' . $e->getMessage()];
         }
     }
