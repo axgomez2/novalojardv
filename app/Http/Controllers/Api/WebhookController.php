@@ -26,13 +26,23 @@ class WebhookController extends Controller
 
         $data = $request->all();
 
-        $result = $mercadoPago->processWebhook($data);
-
-        if ($result) {
-            return response()->json(['status' => 'ok']);
+        // Processa mas sempre responde 200: assinatura já foi validada acima.
+        // Retornar 4xx faria o Mercado Pago retentar por horas para IDs inválidos
+        // (ex: payloads de teste do painel). Erros reais ficam no log.
+        try {
+            $processed = $mercadoPago->processWebhook($data);
+            return response()->json([
+                'status'    => 'ok',
+                'processed' => $processed,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Mercado Pago webhook: exceção no processamento', [
+                'error' => $e->getMessage(),
+                'data'  => $data,
+            ]);
+            // 200 mesmo assim: evita retries. O erro já ficou logado para investigação.
+            return response()->json(['status' => 'logged']);
         }
-
-        return response()->json(['status' => 'error'], 400);
     }
 
     /**
