@@ -31,6 +31,39 @@ Route::get('/home-banners', function () {
     return response()->json(['data' => $banners]);
 });
 
+// Categorias (estilos musicais) - apenas categorias pai ativas
+Route::get('/categories', function () {
+    $categories = \App\Models\Category::active()
+        ->parents()
+        ->orderBy('sort_order')
+        ->orderBy('name')
+        ->get(['id', 'name', 'slug', 'icon'])
+        ->map(function ($cat) {
+            // Contar discos novos disponíveis nesta categoria (incluindo subcategorias)
+            $count = \App\Models\VinylStock::where('visibility', 'public')
+                ->where('is_new', true)
+                ->where('availability', 'available')
+                ->where('stock', '>', 0)
+                ->whereHas('categories', function ($q) use ($cat) {
+                    $q->where('categories.id', $cat->id)
+                      ->orWhere('categories.parent_id', $cat->id);
+                })
+                ->count();
+            
+            return [
+                'id' => $cat->id,
+                'name' => $cat->name,
+                'slug' => $cat->slug,
+                'icon' => $cat->icon,
+                'count' => $count,
+            ];
+        })
+        ->filter(fn($cat) => $cat['count'] > 0) // Só mostrar categorias com discos
+        ->values();
+    
+    return response()->json(['data' => $categories]);
+});
+
 // Seções da Home (públicas — apenas ativas, com discos)
 Route::get('/home-sections', function () {
     $sections = \App\Models\HomeSection::with(['vinyls' => function ($q) {
@@ -446,9 +479,26 @@ Route::prefix('vinyls')->group(function () {
         if (request('is_new') !== null) {
             $query->where('is_new', request('is_new') === 'true');
         }
+        
+        // Filtro por categoria (inclui subcategorias se for categoria pai)
         if (request('category')) {
-            $query->whereHas('categories', fn($q) => $q->where('slug', request('category')));
+            $categorySlug = request('category');
+            $category = \App\Models\Category::where('slug', $categorySlug)->first();
+            
+            if ($category) {
+                $query->whereHas('categories', function ($q) use ($category) {
+                    if ($category->isParent()) {
+                        // Se é categoria pai, busca ela e suas filhas
+                        $q->where('categories.id', $category->id)
+                          ->orWhere('categories.parent_id', $category->id);
+                    } else {
+                        // Se é subcategoria, busca apenas ela
+                        $q->where('categories.id', $category->id);
+                    }
+                });
+            }
         }
+        
         if (request('artist')) {
             $query->whereHas('vinylMaster.mainArtists', fn($q) => $q->where('slug', request('artist')));
         }

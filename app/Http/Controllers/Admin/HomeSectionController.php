@@ -89,13 +89,6 @@ class HomeSectionController extends Controller
 
     public function searchVinyls(Request $request)
     {
-        \Log::info('searchVinyls called', [
-            'q' => $request->get('q'),
-            'section_id' => $request->get('section_id'),
-            'type' => $request->get('type'),
-            'user' => auth('admin')->user()?->email,
-        ]);
-        
         $query = $request->get('q', '');
         $sectionId = $request->get('section_id');
         $type = $request->get('type');

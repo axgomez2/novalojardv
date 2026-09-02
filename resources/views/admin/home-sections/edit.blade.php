@@ -180,18 +180,14 @@
         });
 
         async function searchVinyls(query) {
-            console.log('Searching for:', query, 'sectionId:', sectionId, 'type:', sectionType);
             try {
-                const url = `/admin/home-sections/search-vinyls?q=${encodeURIComponent(query)}&section_id=${sectionId}&type=${sectionType}`;
-                console.log('Fetching URL:', url);
-                const response = await fetch(url, {
+                const response = await fetch(`/admin/home-sections/search-vinyls?q=${encodeURIComponent(query)}&section_id=${sectionId}&type=${sectionType}`, {
                     headers: { 
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
                     credentials: 'same-origin'
                 });
-                console.log('Response status:', response.status);
                 
                 if (!response.ok) {
                     console.error('Search failed:', response.status, response.statusText);
