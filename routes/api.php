@@ -31,6 +31,62 @@ Route::get('/home-banners', function () {
     return response()->json(['data' => $banners]);
 });
 
+// Seções da Home (públicas — apenas ativas, com discos)
+Route::get('/home-sections', function () {
+    $sections = \App\Models\HomeSection::with(['vinyls' => function ($q) {
+        $q->where('visibility', 'public')
+          ->where('stock', '>', 0)
+          ->with('vinylMaster');
+    }])
+        ->active()
+        ->ordered()
+        ->get()
+        ->map(function ($section) {
+            return [
+                'id' => $section->id,
+                'slug' => $section->slug,
+                'title' => $section->title,
+                'subtitle' => $section->subtitle,
+                'type' => $section->type,
+                'view_all_link' => $section->view_all_link,
+                'vinyls' => $section->vinyls->map(function ($vinyl) {
+                    return \App\Support\VinylApiFormatter::format($vinyl);
+                }),
+            ];
+        });
+    return response()->json(['data' => $sections]);
+});
+
+// Seção específica da Home por slug
+Route::get('/home-sections/{slug}', function ($slug) {
+    $section = \App\Models\HomeSection::with(['vinyls' => function ($q) {
+        $q->where('visibility', 'public')
+          ->where('stock', '>', 0)
+          ->with('vinylMaster');
+    }])
+        ->where('slug', $slug)
+        ->active()
+        ->first();
+
+    if (!$section) {
+        return response()->json(['error' => 'Seção não encontrada'], 404);
+    }
+
+    return response()->json([
+        'data' => [
+            'id' => $section->id,
+            'slug' => $section->slug,
+            'title' => $section->title,
+            'subtitle' => $section->subtitle,
+            'type' => $section->type,
+            'view_all_link' => $section->view_all_link,
+            'vinyls' => $section->vinyls->map(function ($vinyl) {
+                return \App\Support\VinylApiFormatter::format($vinyl);
+            }),
+        ],
+    ]);
+});
+
 // Configurações do site (públicas)
 Route::get('/site-settings', function () {
     return response()->json([

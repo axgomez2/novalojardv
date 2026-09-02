@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\Auth\AdminPasswordResetLinkController;
 use App\Http\Controllers\Admin\CoverStatusController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\HomeBannerController;
+use App\Http\Controllers\Admin\HomeSectionController;
 use App\Http\Controllers\Admin\DimensionController;
 use App\Http\Controllers\Admin\FinancialDashboardController;
 use App\Http\Controllers\Admin\FinancialTransactionController;
@@ -134,6 +135,22 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::put('/{homeBanner}', [HomeBannerController::class, 'update'])->name('update');
             Route::post('/{homeBanner}/toggle', [HomeBannerController::class, 'toggle'])->name('toggle');
             Route::delete('/{homeBanner}', [HomeBannerController::class, 'destroy'])->name('destroy');
+        });
+
+        // Seções da Home (Gestão de Discos na Home)
+        Route::prefix('home-sections')->name('home-sections.')->group(function () {
+            Route::get('/', [HomeSectionController::class, 'index'])->name('index');
+            Route::get('/create', [HomeSectionController::class, 'create'])->name('create');
+            Route::post('/', [HomeSectionController::class, 'store'])->name('store');
+            Route::get('/search-vinyls', [HomeSectionController::class, 'searchVinyls'])->name('search-vinyls');
+            Route::post('/reorder', [HomeSectionController::class, 'reorder'])->name('reorder');
+            Route::get('/{homeSection}/edit', [HomeSectionController::class, 'edit'])->name('edit');
+            Route::put('/{homeSection}', [HomeSectionController::class, 'update'])->name('update');
+            Route::delete('/{homeSection}', [HomeSectionController::class, 'destroy'])->name('destroy');
+            Route::post('/{homeSection}/toggle', [HomeSectionController::class, 'toggleActive'])->name('toggle');
+            Route::post('/{homeSection}/items', [HomeSectionController::class, 'addItem'])->name('add-item');
+            Route::delete('/{homeSection}/items/{item}', [HomeSectionController::class, 'removeItem'])->name('remove-item');
+            Route::post('/{homeSection}/items/reorder', [HomeSectionController::class, 'reorderItems'])->name('reorder-items');
         });
 
         // Pré-vendas / Encomendas
