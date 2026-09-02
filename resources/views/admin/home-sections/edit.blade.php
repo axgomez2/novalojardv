@@ -98,7 +98,7 @@
             <div class="rounded-lg bg-white p-4 shadow">
                 <h2 class="text-lg font-semibold text-gray-900 mb-3">Adicionar Discos</h2>
                 <div class="relative">
-                    <input type="text" id="vinyl-search" placeholder="Buscar por título ou artista..."
+                    <input type="text" id="vinyl-search" placeholder="Clique para ver disponíveis ou digite para buscar..."
                            class="block w-full rounded-lg border-gray-300 pl-10 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -166,27 +166,44 @@
         const itemsCount = document.getElementById('items-count');
         const emptyMessage = document.getElementById('empty-message');
 
+        // Buscar ao focar no campo (mostra todos disponíveis)
+        searchInput.addEventListener('focus', function() {
+            if (this.value.trim().length === 0) {
+                searchVinyls('');
+            }
+        });
+
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
             const query = this.value.trim();
-            
-            if (query.length < 2) {
-                searchResults.classList.add('hidden');
-                return;
-            }
-
             searchTimeout = setTimeout(() => searchVinyls(query), 300);
         });
 
         async function searchVinyls(query) {
+            console.log('Searching for:', query, 'sectionId:', sectionId, 'type:', sectionType);
             try {
-                const response = await fetch(`/admin/home-sections/search-vinyls?q=${encodeURIComponent(query)}&section_id=${sectionId}&type=${sectionType}`, {
-                    headers: { 'Accept': 'application/json' }
+                const url = `/admin/home-sections/search-vinyls?q=${encodeURIComponent(query)}&section_id=${sectionId}&type=${sectionType}`;
+                console.log('Fetching URL:', url);
+                const response = await fetch(url, {
+                    headers: { 
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
                 });
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    console.error('Search failed:', response.status, response.statusText);
+                    searchResults.innerHTML = `<p class="p-3 text-sm text-red-500">Erro ao buscar: ${response.status}</p>`;
+                    searchResults.classList.remove('hidden');
+                    return;
+                }
+                
                 const vinyls = await response.json();
                 
-                if (vinyls.length === 0) {
-                    searchResults.innerHTML = '<p class="p-3 text-sm text-gray-500">Nenhum disco encontrado.</p>';
+                if (!Array.isArray(vinyls) || vinyls.length === 0) {
+                    searchResults.innerHTML = '<p class="p-3 text-sm text-gray-500">Nenhum disco encontrado para este tipo de seção.</p>';
                 } else {
                     searchResults.innerHTML = vinyls.map(v => `
                         <div class="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0" onclick="addItem(${v.id})">
@@ -204,7 +221,9 @@
                 }
                 searchResults.classList.remove('hidden');
             } catch (e) {
-                console.error(e);
+                console.error('Search error:', e);
+                searchResults.innerHTML = '<p class="p-3 text-sm text-red-500">Erro ao buscar discos.</p>';
+                searchResults.classList.remove('hidden');
             }
         }
 

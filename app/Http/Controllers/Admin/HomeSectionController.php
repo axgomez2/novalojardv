@@ -89,6 +89,13 @@ class HomeSectionController extends Controller
 
     public function searchVinyls(Request $request)
     {
+        \Log::info('searchVinyls called', [
+            'q' => $request->get('q'),
+            'section_id' => $request->get('section_id'),
+            'type' => $request->get('type'),
+            'user' => auth('admin')->user()?->email,
+        ]);
+        
         $query = $request->get('q', '');
         $sectionId = $request->get('section_id');
         $type = $request->get('type');
@@ -100,13 +107,16 @@ class HomeSectionController extends Controller
                 ->toArray();
         }
 
-        $vinyls = VinylStock::with('vinylMaster')
+        $vinyls = VinylStock::with(['vinylMaster.mainArtists'])
             ->whereNotIn('id', $existingIds)
             ->where('visibility', 'public')
-            ->where(function ($q) use ($query) {
-                $q->whereHas('vinylMaster', function ($q2) use ($query) {
-                    $q2->where('title', 'like', "%{$query}%")
-                        ->orWhere('artist_names', 'like', "%{$query}%");
+            ->when($query, function ($q) use ($query) {
+                $q->where(function ($q2) use ($query) {
+                    $q2->whereHas('vinylMaster', function ($q3) use ($query) {
+                        $q3->where('title', 'like', "%{$query}%");
+                    })->orWhereHas('vinylMaster.mainArtists', function ($q3) use ($query) {
+                        $q3->where('name', 'like', "%{$query}%");
+                    });
                 });
             })
             ->when($type === 'discos_novos', fn($q) => $q->where('is_new', true)->where('availability', 'available'))
