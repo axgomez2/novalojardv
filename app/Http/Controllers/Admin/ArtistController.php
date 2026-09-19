@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\Artist;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -12,6 +13,26 @@ use Illuminate\View\View;
 
 class ArtistController extends Controller
 {
+    /**
+     * Search artists for autocomplete (AJAX)
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $query = $request->get('q', '');
+        
+        if (strlen($query) < 2) {
+            return response()->json(['artists' => []]);
+        }
+
+        $artists = Artist::where('name', 'like', "%{$query}%")
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->limit(10)
+            ->get(['id', 'name', 'discogs_id']);
+
+        return response()->json(['artists' => $artists]);
+    }
+
     public function index(Request $request): View
     {
         $query = Artist::query();

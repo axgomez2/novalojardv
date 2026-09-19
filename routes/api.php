@@ -127,6 +127,54 @@ Route::get('/site-settings', function () {
     ]);
 });
 
+// Selos em Destaque (Featured Labels)
+Route::get('/featured-labels', function () {
+    $labels = \App\Models\FeaturedLabel::with('recordLabel')
+        ->active()
+        ->ordered()
+        ->get()
+        ->map(function ($featured) {
+            $label = $featured->recordLabel;
+            return [
+                'id' => $label->id,
+                'name' => $label->name,
+                'slug' => $label->slug,
+                'logo' => $featured->logo_url,
+                'description' => $label->description,
+            ];
+        });
+
+    return response()->json(['data' => $labels]);
+});
+
+// Discos por Gravadora
+Route::get('/labels/{slug}/vinyls', function ($slug) {
+    $label = \App\Models\RecordLabel::where('slug', $slug)->firstOrFail();
+    
+    $vinyls = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.recordLabel', 'vinylMaster.tracks'])
+        ->where('visibility', 'public')
+        ->where('availability', '!=', 'unavailable')
+        ->whereHas('vinylMaster', function ($q) use ($label) {
+            $q->where('record_label_id', $label->id);
+        })
+        ->orderByRaw('CASE WHEN stock > 0 THEN 0 ELSE 1 END')
+        ->orderBy('created_at', 'desc')
+        ->paginate(request('per_page', 20))
+        ->through(fn($stock) => \App\Support\VinylApiFormatter::format($stock));
+
+    return response()->json([
+        'label' => [
+            'id' => $label->id,
+            'name' => $label->name,
+            'slug' => $label->slug,
+            'logo' => $label->logo,
+            'description' => $label->description,
+            'website' => $label->website,
+        ],
+        ...$vinyls->toArray()
+    ]);
+});
+
 /*
 |--------------------------------------------------------------------------
 | Rotas de Autenticação

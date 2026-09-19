@@ -80,6 +80,93 @@ class VinylController extends Controller
     }
 
     /**
+     * Show the form for manual vinyl creation (without Discogs)
+     */
+    public function createManual(): View
+    {
+        $recordLabels = RecordLabel::active()->orderBy('name')->get();
+
+        return view('admin.vinyls.create-manual', compact('recordLabels'));
+    }
+
+    /**
+     * Store a manually created vinyl record
+     */
+    public function storeManual(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'cover_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:4096',
+            'release_year' => 'nullable|integer|min:1900|max:' . (date('Y') + 1),
+            'country' => 'nullable|string|max:100',
+            'genres' => 'nullable|string|max:500',
+            'styles' => 'nullable|string|max:500',
+            'record_label_id' => 'nullable|exists:record_labels,id',
+            'artist_id' => 'nullable|exists:artists,id',
+            'artist_name' => 'nullable|string|max:255',
+            'artist_discogs_id' => 'nullable|string',
+        ], [
+            'cover_image.required' => 'A imagem de capa é obrigatória.',
+            'cover_image.image' => 'O arquivo precisa ser uma imagem.',
+            'cover_image.max' => 'Imagem máxima de 4 MB.',
+        ]);
+
+        // Upload cover image
+        $coverPath = $request->file('cover_image')->store('vinyl-covers', 'public');
+        $coverUrl = asset('storage/' . $coverPath);
+
+        // Create vinyl master
+        $vinyl = VinylMaster::create([
+            'title' => $validated['title'],
+            'slug' => Str::slug($validated['title']) . '-' . uniqid(),
+            'discogs_release_id' => null,
+            'discogs_master_id' => null,
+            'description' => $validated['description'] ?? null,
+            'cover_image' => $coverUrl,
+            'images' => [['type' => 'primary', 'uri' => $coverUrl]],
+            'discogs_url' => null,
+            'release_year' => $validated['release_year'] ?? null,
+            'country' => $validated['country'] ?? null,
+            'genres' => $validated['genres'] ? array_map('trim', explode(',', $validated['genres'])) : null,
+            'styles' => $validated['styles'] ? array_map('trim', explode(',', $validated['styles'])) : null,
+            'record_label_id' => $validated['record_label_id'] ?? null,
+        ]);
+
+        // Handle artist
+        $artistId = $validated['artist_id'] ?? null;
+        
+        if (!$artistId && !empty($validated['artist_name'])) {
+            // Create new artist
+            $artist = Artist::firstOrCreate(
+                ['discogs_id' => $validated['artist_discogs_id'] ?? null],
+                [
+                    'name' => $validated['artist_name'],
+                    'slug' => Str::slug($validated['artist_name']),
+                    'is_active' => true,
+                ]
+            );
+            $artistId = $artist->id;
+        }
+
+        if ($artistId) {
+            $vinyl->artists()->attach($artistId, ['role' => 'main']);
+        }
+
+        AdminActivityLog::log(
+            auth('admin')->user(),
+            'create',
+            "Disco '{$vinyl->full_title}' criado manualmente",
+            $vinyl
+        );
+
+        // Redirect to step 3: Stock/Commercial data
+        return redirect()
+            ->route('admin.vinyl-stocks.create', ['vinyl_master_id' => $vinyl->id])
+            ->with('success', 'Disco cadastrado! Agora complete os dados de estoque e preços.');
+    }
+
+    /**
      * Search Discogs API
      */
     public function searchDiscogs(Request $request)

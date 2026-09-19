@@ -197,7 +197,29 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             <h3 class="mt-4 text-lg font-medium text-gray-900">Nenhum resultado encontrado</h3>
-            <p class="mt-2 text-sm text-gray-500">Tente buscar com outros termos.</p>
+            <p class="mt-2 text-sm text-gray-500">Tente buscar com outros termos ou cadastre manualmente.</p>
+            <a href="{{ route('admin.vinyls.create.manual') }}" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Cadastrar Manualmente
+            </a>
+        </div>
+
+        <!-- Manual Registration Option -->
+        <div class="rounded-lg bg-white p-6 shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Disco não está no Discogs?</h3>
+                    <p class="mt-1 text-sm text-gray-500">Cadastre manualmente discos que ainda não foram catalogados no Discogs.</p>
+                </div>
+                <a href="{{ route('admin.vinyls.create.manual') }}" class="inline-flex items-center gap-2 rounded-lg border border-indigo-600 bg-white px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Cadastro Manual
+                </a>
+            </div>
         </div>
     </div>
 

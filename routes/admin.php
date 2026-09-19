@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\Auth\AdminNewPasswordController;
 use App\Http\Controllers\Admin\Auth\AdminPasswordResetLinkController;
 use App\Http\Controllers\Admin\CoverStatusController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FeaturedLabelController;
 use App\Http\Controllers\Admin\HomeBannerController;
 use App\Http\Controllers\Admin\HomeSectionController;
 use App\Http\Controllers\Admin\DimensionController;
@@ -79,6 +80,8 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::prefix('vinyls')->name('vinyls.')->group(function () {
             Route::get('/', [VinylController::class, 'index'])->name('index');
             Route::get('/create', [VinylController::class, 'create'])->name('create');
+            Route::get('/create/manual', [VinylController::class, 'createManual'])->name('create.manual');
+            Route::post('/store/manual', [VinylController::class, 'storeManual'])->name('store.manual');
             Route::get('/create/step2', [VinylController::class, 'createStep2'])->name('create.step2');
             Route::post('/', [VinylController::class, 'store'])->name('store');
             Route::get('/{vinyl}', [VinylController::class, 'show'])->name('show');
@@ -153,6 +156,16 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::post('/{homeSection}/items/reorder', [HomeSectionController::class, 'reorderItems'])->name('reorder-items');
         });
 
+        // Selos em Destaque (Featured Labels)
+        Route::prefix('featured-labels')->name('featured-labels.')->group(function () {
+            Route::get('/', [FeaturedLabelController::class, 'index'])->name('index');
+            Route::post('/', [FeaturedLabelController::class, 'store'])->name('store');
+            Route::post('/reorder', [FeaturedLabelController::class, 'reorder'])->name('reorder');
+            Route::put('/{featuredLabel}', [FeaturedLabelController::class, 'update'])->name('update');
+            Route::post('/{featuredLabel}/toggle', [FeaturedLabelController::class, 'toggle'])->name('toggle');
+            Route::delete('/{featuredLabel}', [FeaturedLabelController::class, 'destroy'])->name('destroy');
+        });
+
         // Pré-vendas / Encomendas
         Route::prefix('pre-orders')->name('pre-orders.')->group(function () {
             Route::get('/', [PreOrderController::class, 'index'])->name('index');
@@ -184,6 +197,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::resource('record-labels', RecordLabelController::class)->except(['show']);
 
             // Artists (Artistas)
+            Route::get('artists/search', [ArtistController::class, 'search'])->name('artists.search');
             Route::resource('artists', ArtistController::class)->except(['show']);
 
             // Weights (Pesos)
