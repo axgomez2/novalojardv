@@ -103,18 +103,18 @@
                 </div>
 
                 <!-- Part 1: Condition & Availability -->
-                <div class="rounded-lg bg-white p-6 shadow">
+                <div class="rounded-lg bg-white p-6 shadow" x-data="conditionForm()">
                     <h3 class="mb-4 text-lg font-medium text-gray-900">Condição e Disponibilidade</h3>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Condição *</label>
                             <div class="mt-2 flex gap-4">
                                 <label class="flex items-center gap-2">
-                                    <input type="radio" name="is_new" value="1" {{ old('is_new', '1') == '1' ? 'checked' : '' }} class="text-indigo-600">
+                                    <input type="radio" name="is_new" value="1" x-model="isNew" @change="onConditionChange()" {{ old('is_new', '1') == '1' ? 'checked' : '' }} class="text-indigo-600">
                                     <span class="text-sm text-gray-700">Novo</span>
                                 </label>
                                 <label class="flex items-center gap-2">
-                                    <input type="radio" name="is_new" value="0" {{ old('is_new') === '0' ? 'checked' : '' }} class="text-indigo-600">
+                                    <input type="radio" name="is_new" value="0" x-model="isNew" @change="onConditionChange()" {{ old('is_new') === '0' ? 'checked' : '' }} class="text-indigo-600">
                                     <span class="text-sm text-gray-700">Usado</span>
                                 </label>
                             </div>
@@ -133,21 +133,27 @@
                             </div>
                             <p class="mt-1 text-xs text-gray-500">Define em qual seção da loja o disco será exibido</p>
                         </div>
+
+                        {{-- Tipo de Produto - Radio Buttons --}}
                         <div class="sm:col-span-2">
-                            <label for="product_type_id" class="block text-sm font-medium text-gray-700">Tipo de Produto *</label>
-                            <select name="product_type_id" id="product_type_id" required
-                                    class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">Selecione o tipo de produto...</option>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Produto *</label>
+                            <div class="flex flex-wrap gap-4">
                                 @foreach($productTypes as $type)
-                                    <option value="{{ $type->id }}" {{ old('product_type_id') == $type->id ? 'selected' : '' }}>{{ $type->name }}</option>
+                                    <label class="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors"
+                                           :class="productTypeId == '{{ $type->id }}' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-300 hover:border-gray-400'">
+                                        <input type="radio" name="product_type_id" value="{{ $type->id }}" x-model="productTypeId" required
+                                               class="text-indigo-600 focus:ring-indigo-500">
+                                        <span class="text-sm font-medium">{{ $type->name }}</span>
+                                    </label>
                                 @endforeach
-                            </select>
+                            </div>
                             <p class="mt-1 text-xs text-gray-500">Categoria principal usada pela API e pela vitrine da loja</p>
                             @error('product_type_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                         </div>
+
                         <div>
                             <label for="availability" class="block text-sm font-medium text-gray-700">Disponibilidade *</label>
-                            <select name="availability" id="availability" required x-data x-on:change="$refs.releaseDate.classList.toggle('hidden', $event.target.value !== 'preorder')"
+                            <select name="availability" id="availability" required x-on:change="$refs.releaseDate.classList.toggle('hidden', $event.target.value !== 'preorder')"
                                     class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="available" {{ old('availability', 'available') == 'available' ? 'selected' : '' }}>Disponível</option>
                                 <option value="unavailable" {{ old('availability') == 'unavailable' ? 'selected' : '' }}>Indisponível</option>
@@ -177,25 +183,90 @@
                                    class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <p class="mt-1 text-xs text-gray-500">Sugestão para o cálculo de sinal ao criar pré-vendas.</p>
                         </div>
-                        <div>
-                            <label for="media_status_id" class="block text-sm font-medium text-gray-700">Estado da Mídia</label>
-                            <select name="media_status_id" id="media_status_id" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">Selecione...</option>
+
+                        {{-- Estado da Mídia - Radio Buttons --}}
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Estado da Mídia</label>
+                            <div class="flex flex-wrap gap-3">
                                 @foreach($mediaStatuses as $status)
-                                    <option value="{{ $status->id }}" {{ old('media_status_id') == $status->id ? 'selected' : '' }}>{{ $status->title }}</option>
+                                    <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors text-sm"
+                                           :class="mediaStatusId == '{{ $status->id }}' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-300 hover:border-gray-400'">
+                                        <input type="radio" name="media_status_id" value="{{ $status->id }}" x-model="mediaStatusId"
+                                               class="text-indigo-600 focus:ring-indigo-500">
+                                        <span>{{ $status->title }}</span>
+                                    </label>
                                 @endforeach
-                            </select>
+                            </div>
+                            <p x-show="isNew === '1'" class="mt-1 text-xs text-green-600">
+                                <svg class="inline h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Disco novo: condição "N" selecionada automaticamente
+                            </p>
                         </div>
-                        <div>
-                            <label for="cover_status_id" class="block text-sm font-medium text-gray-700">Estado da Capa</label>
-                            <select name="cover_status_id" id="cover_status_id" class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">Selecione...</option>
+
+                        {{-- Estado da Capa - Radio Buttons --}}
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Estado da Capa</label>
+                            <div class="flex flex-wrap gap-3">
                                 @foreach($coverStatuses as $status)
-                                    <option value="{{ $status->id }}" {{ old('cover_status_id') == $status->id ? 'selected' : '' }}>{{ $status->title }}</option>
+                                    <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors text-sm"
+                                           :class="coverStatusId == '{{ $status->id }}' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-300 hover:border-gray-400'">
+                                        <input type="radio" name="cover_status_id" value="{{ $status->id }}" x-model="coverStatusId"
+                                               class="text-indigo-600 focus:ring-indigo-500">
+                                        <span>{{ $status->title }}</span>
+                                    </label>
                                 @endforeach
-                            </select>
+                            </div>
+                            <p x-show="isNew === '1'" class="mt-1 text-xs text-green-600">
+                                <svg class="inline h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Disco novo: condição "N" selecionada automaticamente
+                            </p>
                         </div>
                     </div>
+
+                    <script>
+                        function conditionForm() {
+                            // Encontrar IDs dos status "N" (Novo/Mint)
+                            const mediaStatuses = @json($mediaStatuses->map(fn($s) => ['id' => $s->id, 'title' => $s->title]));
+                            const coverStatuses = @json($coverStatuses->map(fn($s) => ['id' => $s->id, 'title' => $s->title]));
+                            
+                            const findNStatus = (statuses) => {
+                                const nStatus = statuses.find(s => s.title === 'N' || s.title === 'M' || s.title.toLowerCase().includes('mint') || s.title.toLowerCase().includes('novo'));
+                                return nStatus ? String(nStatus.id) : '';
+                            };
+
+                            const nMediaId = findNStatus(mediaStatuses);
+                            const nCoverId = findNStatus(coverStatuses);
+
+                            return {
+                                isNew: '{{ old('is_new', '1') }}',
+                                productTypeId: '{{ old('product_type_id', '') }}',
+                                mediaStatusId: '{{ old('media_status_id', '') }}',
+                                coverStatusId: '{{ old('cover_status_id', '') }}',
+                                nMediaId: nMediaId,
+                                nCoverId: nCoverId,
+
+                                init() {
+                                    // Se é disco novo e não tem status selecionado, auto-preencher
+                                    if (this.isNew === '1') {
+                                        if (!this.mediaStatusId && this.nMediaId) {
+                                            this.mediaStatusId = this.nMediaId;
+                                        }
+                                        if (!this.coverStatusId && this.nCoverId) {
+                                            this.coverStatusId = this.nCoverId;
+                                        }
+                                    }
+                                },
+
+                                onConditionChange() {
+                                    if (this.isNew === '1') {
+                                        // Auto-preencher com condição "N" para discos novos
+                                        if (this.nMediaId) this.mediaStatusId = this.nMediaId;
+                                        if (this.nCoverId) this.coverStatusId = this.nCoverId;
+                                    }
+                                }
+                            }
+                        }
+                    </script>
                 </div>
 
                 <!-- Part 2: Categories -->

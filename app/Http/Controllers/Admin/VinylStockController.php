@@ -442,6 +442,111 @@ class VinylStockController extends Controller
     }
 
     /**
+     * Quick stock management (add, remove, set) - modal action
+     */
+    public function quickStock(Request $request, VinylStock $vinylStock): RedirectResponse
+    {
+        $validated = $request->validate([
+            'operation_type' => 'required|in:add,remove,set',
+            'quantity' => 'required|integer|min:0',
+            'cost_price' => 'nullable|numeric|min:0',
+            'supplier_id' => 'nullable|exists:suppliers,id',
+            'purchase_date' => 'nullable|date',
+            'invoice_number' => 'nullable|string|max:100',
+            'reason' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $stockBefore = $vinylStock->stock;
+            $operationType = $validated['operation_type'];
+            $quantity = $validated['quantity'];
+
+            switch ($operationType) {
+                case 'add':
+                    $vinylStock->increment('stock', $quantity);
+                    $movementType = 'purchase';
+                    $movementQuantity = $quantity;
+                    $message = "Entrada registrada: +{$quantity} unidades";
+                    
+                    // Update cost price and supplier for purchases
+                    $updateData = [];
+                    if (!empty($validated['cost_price'])) {
+                        $updateData['cost_price'] = $validated['cost_price'];
+                    }
+                    if (!empty($validated['supplier_id'])) {
+                        $updateData['supplier_id'] = $validated['supplier_id'];
+                    }
+                    if (!empty($updateData)) {
+                        $vinylStock->update($updateData);
+                    }
+                    break;
+
+                case 'remove':
+                    $removeQty = min($quantity, $stockBefore); // Can't remove more than available
+                    $vinylStock->decrement('stock', $removeQty);
+                    $movementType = 'adjustment';
+                    $movementQuantity = -$removeQty;
+                    $message = "Saída registrada: -{$removeQty} unidades";
+                    break;
+
+                case 'set':
+                    $vinylStock->update(['stock' => $quantity]);
+                    $movementType = 'adjustment';
+                    $movementQuantity = $quantity - $stockBefore;
+                    $message = "Estoque definido: {$stockBefore} → {$quantity}";
+                    break;
+
+                default:
+                    throw new \Exception('Operação inválida');
+            }
+
+            // Create stock movement record
+            $notes = $validated['notes'] ?? '';
+            if (!empty($validated['reason'])) {
+                $reasonLabels = [
+                    'inventory_adjustment' => 'Ajuste de inventário',
+                    'damaged' => 'Disco danificado',
+                    'lost' => 'Perda/Extravio',
+                    'return_supplier' => 'Devolução ao fornecedor',
+                    'promotional' => 'Uso promocional',
+                    'other' => 'Outro',
+                ];
+                $notes = ($reasonLabels[$validated['reason']] ?? $validated['reason']) . ($notes ? " - {$notes}" : '');
+            }
+
+            $vinylStock->stockMovements()->create([
+                'user_id' => auth('admin')->id(),
+                'type' => $movementType,
+                'quantity' => $movementQuantity,
+                'stock_before' => $stockBefore,
+                'stock_after' => $vinylStock->fresh()->stock,
+                'unit_price' => $validated['cost_price'] ?? null,
+                'total_price' => ($validated['cost_price'] ?? 0) * abs($movementQuantity),
+                'reference' => $validated['invoice_number'] ?? null,
+                'notes' => $notes ?: null,
+                'created_at' => $validated['purchase_date'] ?? now(),
+            ]);
+
+            AdminActivityLog::log(
+                auth('admin')->user(),
+                'update',
+                "{$message} em {$vinylStock->vinylMaster->full_title}",
+                $vinylStock
+            );
+
+            DB::commit();
+
+            return back()->with('success', $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Erro ao atualizar estoque: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Adjust stock
      */
     public function adjustStock(Request $request, VinylStock $vinylStock): RedirectResponse

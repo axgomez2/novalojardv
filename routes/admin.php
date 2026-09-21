@@ -88,6 +88,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::get('/{vinyl}/edit', [VinylController::class, 'edit'])->name('edit');
             Route::put('/{vinyl}', [VinylController::class, 'update'])->name('update');
             Route::delete('/{vinyl}', [VinylController::class, 'destroy'])->name('destroy');
+            Route::delete('/bulk/destroy', [VinylController::class, 'bulkDestroy'])->name('bulk-destroy');
 
             // Vinyl Images
             Route::get('/{vinyl}/images', [VinylImageController::class, 'index'])->name('images.index');
@@ -123,6 +124,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::delete('/{vinylStock}', [VinylStockController::class, 'destroy'])->name('destroy');
             Route::post('/{vinylStock}/add-stock', [VinylStockController::class, 'addStock'])->name('add-stock');
             Route::post('/{vinylStock}/quick-add-stock', [VinylStockController::class, 'quickAddStock'])->name('quick-add-stock');
+            Route::post('/{vinylStock}/quick-stock', [VinylStockController::class, 'quickStock'])->name('quick-stock');
             Route::post('/{vinylStock}/adjust-stock', [VinylStockController::class, 'adjustStock'])->name('adjust-stock');
         });
 

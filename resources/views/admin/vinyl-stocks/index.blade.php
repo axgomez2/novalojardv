@@ -106,7 +106,7 @@
                         <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">Estoque</th>
                         <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Custo</th>
                         <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Venda</th>
-                        <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">Adicionar</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">Gerenciar</th>
                         <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Ações</th>
                     </tr>
                 </thead>
@@ -186,11 +186,11 @@
                             <td class="whitespace-nowrap px-6 py-4 text-center">
                                 <button type="button" 
                                         @click="$dispatch('open-quick-add', { stockId: {{ $stock->id }}, stockTitle: '{{ addslashes($stock->vinylMaster->title) }}', currentStock: {{ $stock->stock }}, costPrice: {{ $stock->cost_price ?? 0 }}, supplierId: {{ $stock->supplier_id ?? 'null' }} })"
-                                        class="inline-flex items-center gap-1 rounded bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-200" title="Entrada Rápida">
+                                        class="inline-flex items-center gap-1 rounded bg-indigo-100 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-200" title="Gerenciar Estoque">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
                                     </svg>
-                                    Entrada
+                                    Estoque
                                 </button>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
@@ -233,7 +233,7 @@
         <div class="mt-6">{{ $stocks->links() }}</div>
     @endif
 
-    <!-- Quick Add Stock Modal -->
+    <!-- Quick Stock Management Modal -->
     <div x-data="{ 
             open: false, 
             stockId: null, 
@@ -243,8 +243,19 @@
             supplierId: null,
             quantity: 1,
             totalValue: 0,
+            operationType: 'add',
+            newStock: 0,
             updateTotal() {
                 this.totalValue = (this.quantity * this.costPrice).toFixed(2);
+            },
+            updateNewStock() {
+                if (this.operationType === 'add') {
+                    this.newStock = parseInt(this.currentStock) + parseInt(this.quantity || 0);
+                } else if (this.operationType === 'remove') {
+                    this.newStock = Math.max(0, parseInt(this.currentStock) - parseInt(this.quantity || 0));
+                } else {
+                    this.newStock = parseInt(this.quantity || 0);
+                }
             }
         }" 
         @open-quick-add.window="
@@ -255,7 +266,9 @@
             costPrice = $event.detail.costPrice;
             supplierId = $event.detail.supplierId;
             quantity = 1;
+            operationType = 'add';
             updateTotal();
+            updateNewStock();
         "
         x-show="open" 
         x-cloak
@@ -274,41 +287,84 @@
                  class="relative w-full max-w-lg transform rounded-lg bg-white shadow-xl">
                 
                 <div class="border-b border-gray-200 px-6 py-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Entrada Rápida de Estoque</h3>
+                    <h3 class="text-lg font-semibold text-gray-900">Gerenciar Estoque</h3>
                     <p class="mt-1 text-sm text-gray-500" x-text="stockTitle"></p>
                 </div>
 
-                <form :action="'/admin/vinyl-stocks/' + stockId + '/quick-add-stock'" method="POST" class="p-6">
+                <form :action="'/admin/vinyl-stocks/' + stockId + '/quick-stock'" method="POST" class="p-6">
                     @csrf
                     <div class="space-y-4">
                         <!-- Current Stock Info -->
-                        <div class="rounded-lg bg-gray-50 p-3">
-                            <p class="text-sm text-gray-600">Estoque atual: <span class="font-semibold text-gray-900" x-text="currentStock"></span> unidades</p>
+                        <div class="rounded-lg bg-gray-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Estoque atual</p>
+                                    <p class="text-2xl font-bold text-gray-900" x-text="currentStock"></p>
+                                </div>
+                                <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                </svg>
+                                <div>
+                                    <p class="text-sm text-gray-600">Novo estoque</p>
+                                    <p class="text-2xl font-bold" :class="newStock > currentStock ? 'text-green-600' : (newStock < currentStock ? 'text-red-600' : 'text-gray-900')" x-text="newStock"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Operation Type -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Operação</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <label class="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border cursor-pointer transition-colors"
+                                       :class="operationType === 'add' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 hover:border-gray-400'">
+                                    <input type="radio" name="operation_type" value="add" x-model="operationType" @change="updateNewStock()" class="sr-only">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                    </svg>
+                                    <span class="text-sm font-medium">Entrada</span>
+                                </label>
+                                <label class="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border cursor-pointer transition-colors"
+                                       :class="operationType === 'remove' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-300 hover:border-gray-400'">
+                                    <input type="radio" name="operation_type" value="remove" x-model="operationType" @change="updateNewStock()" class="sr-only">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                                    </svg>
+                                    <span class="text-sm font-medium">Saída</span>
+                                </label>
+                                <label class="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border cursor-pointer transition-colors"
+                                       :class="operationType === 'set' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 hover:border-gray-400'">
+                                    <input type="radio" name="operation_type" value="set" x-model="operationType" @change="updateNewStock()" class="sr-only">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                    <span class="text-sm font-medium">Definir</span>
+                                </label>
+                            </div>
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <!-- Quantity -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Quantidade *</label>
-                                <input type="number" name="quantity" x-model="quantity" @input="updateTotal()" min="1" required
-                                       class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <label class="block text-sm font-medium text-gray-700" x-text="operationType === 'set' ? 'Novo Estoque *' : 'Quantidade *'"></label>
+                                <input type="number" name="quantity" x-model="quantity" @input="updateTotal(); updateNewStock()" min="0" required
+                                       class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg font-semibold text-center">
                             </div>
 
-                            <!-- Cost Price -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Valor Unitário (R$) *</label>
-                                <input type="number" name="cost_price" x-model="costPrice" @input="updateTotal()" step="0.01" min="0" required
+                            <!-- Cost Price (only for add) -->
+                            <div x-show="operationType === 'add'">
+                                <label class="block text-sm font-medium text-gray-700">Valor Unitário (R$)</label>
+                                <input type="number" name="cost_price" x-model="costPrice" @input="updateTotal()" step="0.01" min="0"
                                        class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </div>
                         </div>
 
-                        <!-- Total Value Display -->
-                        <div class="rounded-lg bg-green-50 p-3">
+                        <!-- Total Value Display (only for add) -->
+                        <div x-show="operationType === 'add'" class="rounded-lg bg-green-50 p-3">
                             <p class="text-sm text-green-700">Valor total da entrada: <span class="font-bold text-green-800">R$ <span x-text="totalValue"></span></span></p>
                         </div>
 
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <!-- Supplier -->
+                        <!-- Supplier (only for add) -->
+                        <div x-show="operationType === 'add'" class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Fornecedor</label>
                                 <select name="supplier_id" x-model="supplierId"
@@ -319,8 +375,6 @@
                                     @endforeach
                                 </select>
                             </div>
-
-                            <!-- Purchase Date -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Data da Compra</label>
                                 <input type="date" name="purchase_date" value="{{ date('Y-m-d') }}"
@@ -328,17 +382,32 @@
                             </div>
                         </div>
 
-                        <!-- Invoice Number -->
-                        <div>
+                        <!-- Invoice Number (only for add) -->
+                        <div x-show="operationType === 'add'">
                             <label class="block text-sm font-medium text-gray-700">Nº Nota Fiscal / Referência</label>
                             <input type="text" name="invoice_number" placeholder="Ex: NF-12345"
                                    class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
 
+                        <!-- Reason (for remove/set) -->
+                        <div x-show="operationType !== 'add'">
+                            <label class="block text-sm font-medium text-gray-700">Motivo *</label>
+                            <select name="reason" :required="operationType !== 'add'"
+                                    class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">Selecione o motivo...</option>
+                                <option value="inventory_adjustment">Ajuste de inventário</option>
+                                <option value="damaged">Disco danificado</option>
+                                <option value="lost">Perda/Extravio</option>
+                                <option value="return_supplier">Devolução ao fornecedor</option>
+                                <option value="promotional">Uso promocional</option>
+                                <option value="other">Outro</option>
+                            </select>
+                        </div>
+
                         <!-- Notes -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Observações</label>
-                            <textarea name="notes" rows="2" placeholder="Observações sobre a compra..."
+                            <textarea name="notes" rows="2" placeholder="Observações sobre a movimentação..."
                                       class="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
                         </div>
                     </div>
@@ -347,8 +416,11 @@
                         <button type="button" @click="open = false" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                             Cancelar
                         </button>
-                        <button type="submit" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-                            Registrar Entrada
+                        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white"
+                                :class="operationType === 'add' ? 'bg-green-600 hover:bg-green-700' : (operationType === 'remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700')">
+                            <span x-show="operationType === 'add'">Registrar Entrada</span>
+                            <span x-show="operationType === 'remove'">Registrar Saída</span>
+                            <span x-show="operationType === 'set'">Definir Estoque</span>
                         </button>
                     </div>
                 </form>

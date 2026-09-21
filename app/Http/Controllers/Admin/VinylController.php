@@ -541,4 +541,38 @@ class VinylController extends Controller
             ->route('admin.vinyls.index')
             ->with('success', 'Disco excluído com sucesso!');
     }
+
+    /**
+     * Bulk delete vinyl records
+     */
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'exists:vinyl_masters,id',
+        ]);
+
+        $count = 0;
+        $titles = [];
+
+        foreach ($validated['ids'] as $id) {
+            $vinyl = VinylMaster::find($id);
+            if ($vinyl) {
+                $titles[] = $vinyl->full_title;
+                $vinyl->stocks()->withTrashed()->forceDelete();
+                $vinyl->forceDelete();
+                $count++;
+            }
+        }
+
+        AdminActivityLog::log(
+            auth('admin')->user(),
+            'delete',
+            "Exclusão em massa: {$count} disco(s) excluídos - " . implode(', ', array_slice($titles, 0, 5)) . (count($titles) > 5 ? '...' : '')
+        );
+
+        return redirect()
+            ->route('admin.vinyls.index')
+            ->with('success', "{$count} disco(s) excluído(s) com sucesso!");
+    }
 }

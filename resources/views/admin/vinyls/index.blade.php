@@ -1,16 +1,29 @@
 <x-admin-layout>
-    <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" x-data="{ selectedIds: [], selectAll: false }">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Discos de Vinil</h1>
             <p class="mt-1 text-sm text-gray-600">Gerencie o catálogo de discos</p>
         </div>
-        <a href="{{ route('admin.vinyls.create') }}"
-           class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Novo Disco
-        </a>
+        <div class="flex gap-2">
+            <!-- Bulk Delete Button -->
+            <button type="button" 
+                    x-show="selectedIds.length > 0"
+                    x-cloak
+                    @click="$dispatch('open-bulk-delete', { ids: selectedIds })"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Excluir (<span x-text="selectedIds.length"></span>)
+            </button>
+            <a href="{{ route('admin.vinyls.create') }}"
+               class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Novo Disco
+            </a>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -53,12 +66,18 @@
     </div>
 
     <!-- Vinyl List -->
-    <div class="overflow-hidden rounded-lg bg-white shadow">
+    <div class="overflow-hidden rounded-lg bg-white shadow" x-data="bulkSelectVinyls()">
         @if($vinyls->count() > 0)
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
+                            <th class="w-12 px-4 py-3 text-center">
+                                <input type="checkbox" 
+                                       x-model="selectAll" 
+                                       @change="toggleSelectAll()"
+                                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            </th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Disco</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ano</th>
                             <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Custo</th>
@@ -75,7 +94,13 @@
                                 $stock = $vinyl->stocks->first();
                                 $isPreorder = $stock && $stock->availability === 'preorder';
                             @endphp
-                            <tr class="hover:bg-gray-50">
+                            <tr class="hover:bg-gray-50" :class="selectedIds.includes({{ $vinyl->id }}) ? 'bg-indigo-50' : ''">
+                                <td class="px-4 py-3 text-center">
+                                    <input type="checkbox" 
+                                           value="{{ $vinyl->id }}"
+                                           x-model.number="selectedIds"
+                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                </td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
                                         <div class="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-gray-100">
@@ -209,4 +234,99 @@
     @if ($vinyls->hasPages())
         <div class="mt-6">{{ $vinyls->links() }}</div>
     @endif
+
+    <!-- Bulk Delete Modal -->
+    <div x-data="{ 
+            open: false, 
+            ids: [],
+            deleting: false
+        }" 
+        @open-bulk-delete.window="open = true; ids = $event.detail.ids"
+        x-show="open" 
+        x-cloak
+        class="fixed inset-0 z-50 overflow-y-auto">
+        
+        <div class="flex min-h-screen items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                 @click="open = false" class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
+
+            <!-- Modal -->
+            <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 class="relative w-full max-w-md transform rounded-lg bg-white shadow-xl">
+                
+                <div class="p-6">
+                    <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <h3 class="mt-4 text-lg font-semibold text-gray-900 text-center">Confirmar Exclusão em Massa</h3>
+                    <p class="mt-2 text-sm text-gray-500 text-center">
+                        Você está prestes a excluir <span class="font-bold text-red-600" x-text="ids.length"></span> disco(s).
+                        <br>Esta ação não pode ser desfeita.
+                    </p>
+                    <p class="mt-2 text-xs text-gray-400 text-center">
+                        Os estoques relacionados também serão excluídos.
+                    </p>
+
+                    <form method="POST" action="{{ route('admin.vinyls.bulk-destroy') }}" class="mt-6">
+                        @csrf
+                        @method('DELETE')
+                        <template x-for="id in ids" :key="id">
+                            <input type="hidden" name="ids[]" :value="id">
+                        </template>
+                        
+                        <div class="flex gap-3">
+                            <button type="button" @click="open = false" 
+                                    class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                Cancelar
+                            </button>
+                            <button type="submit" 
+                                    :disabled="deleting"
+                                    @click="deleting = true"
+                                    class="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                                <span x-show="!deleting">Excluir Todos</span>
+                                <span x-show="deleting">Excluindo...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function bulkSelectVinyls() {
+            return {
+                selectedIds: [],
+                selectAll: false,
+                allIds: @json($vinyls->pluck('id')),
+
+                toggleSelectAll() {
+                    if (this.selectAll) {
+                        this.selectedIds = [...this.allIds];
+                    } else {
+                        this.selectedIds = [];
+                    }
+                    // Dispatch event to parent
+                    window.dispatchEvent(new CustomEvent('vinyl-selection-changed', { detail: { ids: this.selectedIds } }));
+                },
+
+                init() {
+                    this.$watch('selectedIds', (value) => {
+                        this.selectAll = value.length === this.allIds.length && this.allIds.length > 0;
+                        // Update parent component
+                        const parentEl = document.querySelector('[x-data*="selectedIds"]');
+                        if (parentEl && parentEl.__x) {
+                            parentEl.__x.$data.selectedIds = value;
+                        }
+                    });
+                }
+            }
+        }
+    </script>
 </x-admin-layout>
