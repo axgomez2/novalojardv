@@ -43,6 +43,28 @@ class CartController extends Controller
         $stock = VinylStock::findOrFail($data['vinyl_stock_id']);
         $qty = $data['quantity'] ?? 1;
 
+        // Validar estoque (exceto pré-venda)
+        if ($stock->availability !== 'preorder') {
+            $existing = $cart->items()->where('vinyl_stock_id', $stock->id)->first();
+            $currentQty = $existing ? $existing->quantity : 0;
+            $newTotalQty = $request->boolean('replace') ? $qty : ($currentQty + $qty);
+
+            if ($newTotalQty > $stock->stock) {
+                return response()->json([
+                    'message' => "Quantidade indisponível. Estoque atual: {$stock->stock} unidade(s).",
+                    'available_stock' => $stock->stock,
+                    'current_in_cart' => $currentQty,
+                ], 422);
+            }
+
+            // Verificar se o produto está disponível para venda
+            if ($stock->stock <= 0) {
+                return response()->json([
+                    'message' => 'Produto esgotado.',
+                ], 422);
+            }
+        }
+
         if ($request->boolean('replace')) {
             $existing = $cart->items()->where('vinyl_stock_id', $stock->id)->first();
             if ($existing) {
@@ -78,7 +100,21 @@ class CartController extends Controller
             return response()->json(['message' => 'Item não encontrado.'], 404);
         }
 
-        $item->update(['quantity' => $data['quantity']]);
+        $stock = $item->vinylStock;
+        $newQty = $data['quantity'];
+
+        // Validar estoque (exceto pré-venda)
+        if ($stock && $stock->availability !== 'preorder') {
+            if ($newQty > $stock->stock) {
+                return response()->json([
+                    'message' => "Quantidade indisponível. Estoque atual: {$stock->stock} unidade(s).",
+                    'available_stock' => $stock->stock,
+                    'requested' => $newQty,
+                ], 422);
+            }
+        }
+
+        $item->update(['quantity' => $newQty]);
 
         return $this->index($request);
     }
@@ -113,6 +149,7 @@ class CartController extends Controller
      * Sincroniza um array de itens do localStorage com o carrinho do servidor.
      * Estratégia: para cada item enviado, faz upsert mantendo a maior quantidade.
      * Não remove itens já existentes no servidor.
+     * Respeita o limite de estoque.
      */
     public function sync(Request $request)
     {
@@ -124,6 +161,7 @@ class CartController extends Controller
 
         $user = $request->user();
         $cart = $user->getOrCreateCart();
+        $errors = [];
 
         foreach ($data['items'] as $payload) {
             $stock = VinylStock::find($payload['id']);
@@ -132,10 +170,24 @@ class CartController extends Controller
             $existing = $cart->items()->where('vinyl_stock_id', $stock->id)->first();
             $qty = (int) $payload['quantity'];
 
+            // Limitar quantidade ao estoque disponível (exceto pré-venda)
+            if ($stock->availability !== 'preorder' && $qty > $stock->stock) {
+                $qty = $stock->stock;
+                if ($qty <= 0) {
+                    $errors[] = "'{$stock->vinylMaster?->title}' está esgotado.";
+                    continue;
+                }
+                $errors[] = "'{$stock->vinylMaster?->title}' ajustado para {$qty} unidade(s) (estoque limitado).";
+            }
+
             if ($existing) {
-                // mantém a maior quantidade entre local e servidor
+                // mantém a maior quantidade entre local e servidor, respeitando estoque
+                $finalQty = max($existing->quantity, $qty);
+                if ($stock->availability !== 'preorder' && $finalQty > $stock->stock) {
+                    $finalQty = $stock->stock;
+                }
                 $existing->update([
-                    'quantity'   => max($existing->quantity, $qty),
+                    'quantity'   => $finalQty,
                     'unit_price' => $stock->current_price,
                 ]);
             } else {
@@ -147,7 +199,13 @@ class CartController extends Controller
             }
         }
 
-        return $this->index($request);
+        $response = $this->index($request)->getData(true);
+        
+        if (!empty($errors)) {
+            $response['warnings'] = $errors;
+        }
+
+        return response()->json($response);
     }
 
     /**
