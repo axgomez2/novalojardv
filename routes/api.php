@@ -69,7 +69,8 @@ Route::get('/home-sections', function () {
     $sections = \App\Models\HomeSection::with(['vinyls' => function ($q) {
         $q->where('visibility', 'public')
           ->where('stock', '>', 0)
-          ->with('vinylMaster');
+          ->with('vinylMaster')
+          ->orderByPivot('position', 'desc'); // Último adicionado primeiro
     }])
         ->active()
         ->ordered()
@@ -95,7 +96,8 @@ Route::get('/home-sections/{slug}', function ($slug) {
     $section = \App\Models\HomeSection::with(['vinyls' => function ($q) {
         $q->where('visibility', 'public')
           ->where('stock', '>', 0)
-          ->with('vinylMaster');
+          ->with('vinylMaster')
+          ->orderByPivot('position', 'desc'); // Último adicionado primeiro
     }])
         ->where('slug', $slug)
         ->active()
