@@ -112,15 +112,18 @@
             {{-- Lista de Discos Adicionados --}}
             <div class="rounded-lg bg-white shadow overflow-hidden">
                 <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                    <h2 class="text-lg font-semibold text-gray-900">Discos na Seção</h2>
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">Discos na Seção</h2>
+                        <p class="text-xs text-gray-500">Arraste para reordenar. O primeiro da lista aparece primeiro na home.</p>
+                    </div>
                     <span class="text-sm text-gray-500" id="items-count">{{ $homeSection->items->count() }}/{{ $homeSection->max_items }}</span>
                 </div>
                 
                 <div id="section-items" class="divide-y divide-gray-200">
-                    @forelse($homeSection->items as $item)
-                        <div class="flex items-center gap-4 p-4 hover:bg-gray-50" data-item-id="{{ $item->id }}">
-                            <span class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-sm font-medium">
-                                {{ $item->position }}
+                    @forelse($homeSection->items->sortBy('position') as $index => $item)
+                        <div class="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-move" data-item-id="{{ $item->id }}">
+                            <span class="drag-handle flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-sm font-medium position-number">
+                                {{ $index + 1 }}
                             </span>
                             <img src="{{ $item->vinyl->vinylMaster->cover_url ?? '/placeholder.jpg' }}" 
                                  alt="" class="w-12 h-12 rounded object-cover flex-shrink-0">
@@ -153,6 +156,7 @@
     </div>
 
     @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
         const sectionId = {{ $homeSection->id }};
         const sectionType = '{{ $homeSection->type }}';
@@ -165,6 +169,49 @@
         const sectionItems = document.getElementById('section-items');
         const itemsCount = document.getElementById('items-count');
         const emptyMessage = document.getElementById('empty-message');
+
+        // Inicializar Sortable para drag and drop
+        const sortable = new Sortable(sectionItems, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'bg-indigo-50',
+            onEnd: async function(evt) {
+                // Atualizar números de posição visualmente
+                updatePositionNumbers();
+                
+                // Salvar nova ordem no servidor
+                const items = Array.from(sectionItems.querySelectorAll('[data-item-id]'))
+                    .map(el => parseInt(el.dataset.itemId));
+                
+                try {
+                    const response = await fetch(`/admin/home-sections/${sectionId}/items/reorder`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ items: items })
+                    });
+                    const data = await response.json();
+                    if (!data.success) {
+                        console.error('Erro ao salvar ordem');
+                    }
+                } catch (e) {
+                    console.error('Erro ao salvar ordem:', e);
+                }
+            }
+        });
+
+        function updatePositionNumbers() {
+            const items = sectionItems.querySelectorAll('[data-item-id]');
+            items.forEach((item, index) => {
+                const positionEl = item.querySelector('.position-number');
+                if (positionEl) {
+                    positionEl.textContent = index + 1;
+                }
+            });
+        }
 
         // Buscar ao focar no campo (mostra todos disponíveis)
         searchInput.addEventListener('focus', function() {

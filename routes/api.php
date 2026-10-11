@@ -67,7 +67,7 @@ Route::get('/categories', function () {
 // Seções da Home (públicas — apenas ativas, com discos)
 Route::get('/home-sections', function () {
     $sections = \App\Models\HomeSection::with(['items' => function ($q) {
-        $q->orderBy('id', 'desc') // Último adicionado primeiro
+        $q->orderBy('position', 'asc') // Ordenado pela posição definida no painel
           ->with(['vinyl' => function ($q2) {
               $q2->where('visibility', 'public')
                 ->where('stock', '>', 0)
@@ -99,7 +99,7 @@ Route::get('/home-sections', function () {
 // Seção específica da Home por slug
 Route::get('/home-sections/{slug}', function ($slug) {
     $section = \App\Models\HomeSection::with(['items' => function ($q) {
-        $q->orderBy('id', 'desc') // Último adicionado primeiro
+        $q->orderBy('position', 'asc') // Ordenado pela posição definida no painel
           ->with(['vinyl' => function ($q2) {
               $q2->where('visibility', 'public')
                 ->where('stock', '>', 0)
