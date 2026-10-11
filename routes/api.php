@@ -247,6 +247,15 @@ Route::get('/charts', function () {
                 'period' => $chart->period,
                 'cover_image' => $chart->cover_url,
                 'vinyls_count' => $chart->vinyls->count(),
+                'vinyls' => $chart->vinyls->take(10)->map(function ($vinyl) {
+                    return [
+                        'id' => $vinyl->id,
+                        'title' => $vinyl->title,
+                        'artist' => $vinyl->artist_names,
+                        'cover_image' => $vinyl->cover_url,
+                        'slug' => $vinyl->slug,
+                    ];
+                }),
             ];
         });
 
