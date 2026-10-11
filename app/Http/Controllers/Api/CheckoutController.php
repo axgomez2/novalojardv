@@ -245,6 +245,12 @@ class CheckoutController extends Controller
             return response()->json(['error' => $paymentResult['error']], 500);
         }
 
+        // Limpar carrinho do usuário após criar pedido
+        \App\Models\Cart::where('client_user_id', $user->id)->delete();
+        \App\Models\CartItem::whereHas('cart', function ($q) use ($user) {
+            $q->where('client_user_id', $user->id);
+        })->delete();
+
         return response()->json([
             'data' => [
                 'order_id' => $order->id,
