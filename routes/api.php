@@ -234,7 +234,7 @@ Route::prefix('dj')->middleware('auth:sanctum')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::get('/charts', function () {
-    $charts = \App\Models\Chart::with(['vinyls.mainArtists'])
+    $charts = \App\Models\Chart::with(['vinyls.mainArtists', 'vinyls.stocks', 'vinyls.recordLabel'])
         ->where('is_active', true)
         ->orderBy('sort_order')
         ->orderBy('created_at', 'desc')
@@ -248,12 +248,15 @@ Route::get('/charts', function () {
                 'cover_image' => $chart->cover_url,
                 'vinyls_count' => $chart->vinyls->count(),
                 'vinyls' => $chart->vinyls->take(10)->map(function ($vinyl) {
+                    $stock = $vinyl->stocks->first();
                     return [
-                        'id' => $vinyl->id,
+                        'id' => $stock?->id ?? $vinyl->id,
                         'title' => $vinyl->title,
                         'artist' => $vinyl->artist_names,
+                        'label' => $vinyl->recordLabel?->name,
                         'cover_image' => $vinyl->cover_url,
                         'slug' => $vinyl->slug,
+                        'price' => $stock?->current_price ?? 0,
                     ];
                 }),
             ];
