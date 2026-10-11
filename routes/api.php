@@ -66,16 +66,23 @@ Route::get('/categories', function () {
 
 // Seções da Home (públicas — apenas ativas, com discos)
 Route::get('/home-sections', function () {
-    $sections = \App\Models\HomeSection::with(['vinyls' => function ($q) {
-        $q->where('visibility', 'public')
-          ->where('stock', '>', 0)
-          ->with('vinylMaster')
-          ->orderByPivot('created_at', 'desc'); // Último adicionado primeiro
+    $sections = \App\Models\HomeSection::with(['items' => function ($q) {
+        $q->orderBy('id', 'desc') // Último adicionado primeiro
+          ->with(['vinyl' => function ($q2) {
+              $q2->where('visibility', 'public')
+                ->where('stock', '>', 0)
+                ->with('vinylMaster');
+          }]);
     }])
         ->active()
         ->ordered()
         ->get()
         ->map(function ($section) {
+            // Filtrar itens cujo vinyl existe e está público/em estoque
+            $vinyls = $section->items
+                ->filter(fn($item) => $item->vinyl !== null)
+                ->map(fn($item) => \App\Support\VinylApiFormatter::format($item->vinyl));
+            
             return [
                 'id' => $section->id,
                 'slug' => $section->slug,
@@ -83,9 +90,7 @@ Route::get('/home-sections', function () {
                 'subtitle' => $section->subtitle,
                 'type' => $section->type,
                 'view_all_link' => $section->view_all_link,
-                'vinyls' => $section->vinyls->map(function ($vinyl) {
-                    return \App\Support\VinylApiFormatter::format($vinyl);
-                }),
+                'vinyls' => $vinyls->values(),
             ];
         });
     return response()->json(['data' => $sections]);
@@ -93,11 +98,13 @@ Route::get('/home-sections', function () {
 
 // Seção específica da Home por slug
 Route::get('/home-sections/{slug}', function ($slug) {
-    $section = \App\Models\HomeSection::with(['vinyls' => function ($q) {
-        $q->where('visibility', 'public')
-          ->where('stock', '>', 0)
-          ->with('vinylMaster')
-          ->orderByPivot('created_at', 'desc'); // Último adicionado primeiro
+    $section = \App\Models\HomeSection::with(['items' => function ($q) {
+        $q->orderBy('id', 'desc') // Último adicionado primeiro
+          ->with(['vinyl' => function ($q2) {
+              $q2->where('visibility', 'public')
+                ->where('stock', '>', 0)
+                ->with('vinylMaster');
+          }]);
     }])
         ->where('slug', $slug)
         ->active()
@@ -107,6 +114,11 @@ Route::get('/home-sections/{slug}', function ($slug) {
         return response()->json(['error' => 'Seção não encontrada'], 404);
     }
 
+    // Filtrar itens cujo vinyl existe e está público/em estoque
+    $vinyls = $section->items
+        ->filter(fn($item) => $item->vinyl !== null)
+        ->map(fn($item) => \App\Support\VinylApiFormatter::format($item->vinyl));
+
     return response()->json([
         'data' => [
             'id' => $section->id,
@@ -115,9 +127,7 @@ Route::get('/home-sections/{slug}', function ($slug) {
             'subtitle' => $section->subtitle,
             'type' => $section->type,
             'view_all_link' => $section->view_all_link,
-            'vinyls' => $section->vinyls->map(function ($vinyl) {
-                return \App\Support\VinylApiFormatter::format($vinyl);
-            }),
+            'vinyls' => $vinyls->values(),
         ],
     ]);
 });
