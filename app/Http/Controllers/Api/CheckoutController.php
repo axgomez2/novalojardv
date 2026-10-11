@@ -340,6 +340,7 @@ class CheckoutController extends Controller
             'tracking_code' => $order->tracking_code,
             'created_at' => $order->created_at->toISOString(),
             'items_count' => $order->items->sum('quantity'),
+            'payment_method' => $order->payments->first()?->payment_method ?? $order->payment_method,
             'items' => $order->items->map(fn($item) => [
                 'id' => $item->id,
                 'vinyl_stock_id' => $item->vinyl_stock_id,
