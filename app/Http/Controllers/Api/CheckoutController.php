@@ -478,6 +478,17 @@ class CheckoutController extends Controller
             }
         }
 
+        // Enviar email de confirmação
+        try {
+            \Illuminate\Support\Facades\Mail::to($order->clientUser->email)
+                ->send(new \App\Mail\OrderConfirmation($order));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Erro ao enviar email de confirmação', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage()
+            ]);
+        }
+
         return response()->json([
             'data' => [
                 'order_number' => $order->order_number,

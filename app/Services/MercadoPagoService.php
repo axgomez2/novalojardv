@@ -526,6 +526,24 @@ class MercadoPagoService
 
             if ($paymentData['status'] === 'approved' && $order->status === 'pending') {
                 $order->update(['status' => 'paid']);
+                
+                // Atualizar estoque
+                foreach ($order->items as $item) {
+                    if ($item->vinylStock) {
+                        $item->vinylStock->decrement('stock', $item->quantity);
+                    }
+                }
+                
+                // Enviar email de confirmação
+                try {
+                    \Illuminate\Support\Facades\Mail::to($order->clientUser->email)
+                        ->send(new \App\Mail\OrderConfirmation($order));
+                } catch (\Exception $e) {
+                    Log::error('Erro ao enviar email de confirmação', [
+                        'order' => $order->order_number,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             return true;
