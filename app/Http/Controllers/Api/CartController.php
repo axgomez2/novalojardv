@@ -11,6 +11,7 @@ class CartController extends Controller
 {
     /**
      * Retorna o carrinho do usuário autenticado.
+     * Valida estoque e ajusta/remove itens automaticamente.
      */
     public function index(Request $request)
     {
@@ -21,9 +22,84 @@ class CartController extends Controller
             'items.vinylStock.vinylMaster.vinylImages',
         ]);
 
-        return response()->json([
+        // Validar e ajustar estoque de cada item
+        $stockIssues = $this->validateAndAdjustCartStock($cart);
+
+        $response = [
             'data' => $this->formatCart($cart),
-        ]);
+        ];
+
+        // Incluir avisos de ajustes de estoque
+        if (!empty($stockIssues)) {
+            $response['stock_warnings'] = $stockIssues;
+        }
+
+        return response()->json($response);
+    }
+
+    /**
+     * Valida o estoque de cada item no carrinho e ajusta automaticamente.
+     * Retorna array de avisos sobre itens removidos ou ajustados.
+     */
+    protected function validateAndAdjustCartStock(ClientCart $cart): array
+    {
+        $issues = [];
+
+        foreach ($cart->items as $item) {
+            $stock = $item->vinylStock;
+            
+            // Se o produto não existe mais ou foi removido
+            if (!$stock) {
+                $issues[] = [
+                    'type' => 'removed',
+                    'message' => 'Um item foi removido do carrinho pois não está mais disponível.',
+                    'item_id' => $item->id,
+                ];
+                $item->delete();
+                continue;
+            }
+
+            // Pular validação para pré-vendas
+            if ($stock->availability === 'preorder') {
+                continue;
+            }
+
+            // Se estoque zerou, remover item
+            if ($stock->stock <= 0) {
+                $issues[] = [
+                    'type' => 'removed',
+                    'message' => "'{$stock->vinylMaster?->title}' foi removido do carrinho pois está esgotado.",
+                    'item_id' => $item->id,
+                    'title' => $stock->vinylMaster?->title,
+                ];
+                $item->delete();
+                continue;
+            }
+
+            // Se quantidade no carrinho excede estoque, ajustar
+            if ($item->quantity > $stock->stock) {
+                $oldQty = $item->quantity;
+                $item->update(['quantity' => $stock->stock]);
+                $issues[] = [
+                    'type' => 'adjusted',
+                    'message' => "Quantidade de '{$stock->vinylMaster?->title}' ajustada de {$oldQty} para {$stock->stock} (estoque disponível).",
+                    'item_id' => $item->id,
+                    'title' => $stock->vinylMaster?->title,
+                    'old_quantity' => $oldQty,
+                    'new_quantity' => $stock->stock,
+                ];
+            }
+        }
+
+        // Recarregar itens após ajustes
+        if (!empty($issues)) {
+            $cart->load([
+                'items.vinylStock.vinylMaster.mainArtists',
+                'items.vinylStock.vinylMaster.vinylImages',
+            ]);
+        }
+
+        return $issues;
     }
 
     /**
