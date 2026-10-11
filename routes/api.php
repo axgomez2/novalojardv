@@ -70,7 +70,7 @@ Route::get('/home-sections', function () {
         $q->where('visibility', 'public')
           ->where('stock', '>', 0)
           ->with('vinylMaster')
-          ->orderByPivot('position', 'desc'); // Último adicionado primeiro
+          ->orderByPivot('created_at', 'desc'); // Último adicionado primeiro
     }])
         ->active()
         ->ordered()
@@ -97,7 +97,7 @@ Route::get('/home-sections/{slug}', function ($slug) {
         $q->where('visibility', 'public')
           ->where('stock', '>', 0)
           ->with('vinylMaster')
-          ->orderByPivot('position', 'desc'); // Último adicionado primeiro
+          ->orderByPivot('created_at', 'desc'); // Último adicionado primeiro
     }])
         ->where('slug', $slug)
         ->active()
