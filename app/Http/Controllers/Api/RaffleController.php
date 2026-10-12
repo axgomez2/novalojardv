@@ -52,6 +52,7 @@ class RaffleController extends Controller
                     'end_date' => $settings->end_date?->format('d/m/Y'),
                     'draw_date' => $settings->draw_date?->format('d/m/Y'),
                 ],
+                'regulation' => $settings->regulation,
             ],
         ]);
     }

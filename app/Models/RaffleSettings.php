@@ -29,7 +29,7 @@ class RaffleSettings extends Model
         return self::firstOrCreate([], [
             'name' => 'Promoção RDV Discos 2026',
             'starting_number' => 1000,
-            'current_number' => 1000,
+            'current_number' => 999, // Começa em 999 para que o primeiro getNextNumber() retorne 1000
             'start_date' => '2026-10-01',
             'end_date' => '2026-12-05',
             'draw_date' => '2026-12-15',
@@ -41,5 +41,13 @@ class RaffleSettings extends Model
         $next = $this->current_number + 1;
         $this->update(['current_number' => $next]);
         return $next;
+    }
+
+    /**
+     * Retorna o próximo número que será gerado (para exibição)
+     */
+    public function getNextAvailableNumber(): int
+    {
+        return $this->current_number + 1;
     }
 }

@@ -7,7 +7,7 @@
             Voltar
         </a>
         <h1 class="mt-2 text-2xl font-bold text-gray-900">Adicionar Números do Sorteio</h1>
-        <p class="text-sm text-gray-600">Próximo número disponível: <span class="font-mono font-bold text-indigo-600">{{ str_pad($settings->current_number + 1, 6, '0', STR_PAD_LEFT) }}</span></p>
+        <p class="text-sm text-gray-600">Próximo número disponível: <span class="font-mono font-bold text-indigo-600">{{ str_pad($settings->getNextAvailableNumber(), 6, '0', STR_PAD_LEFT) }}</span></p>
     </div>
 
     @if($errors->any())
