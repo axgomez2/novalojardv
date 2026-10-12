@@ -744,4 +744,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{code}/pay-balance', [App\Http\Controllers\Api\PreOrderClientController::class, 'payBalance']);
         Route::post('/{code}/request-manual-pix', [App\Http\Controllers\Api\PreOrderClientController::class, 'requestManualPix']);
     });
+
+    // Sorteio (Raffle)
+    Route::prefix('raffle')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\RaffleController::class, 'index']);
+        Route::get('/regulation', [App\Http\Controllers\Api\RaffleController::class, 'regulation']);
+        Route::post('/accept', [App\Http\Controllers\Api\RaffleController::class, 'accept']);
+        Route::get('/download-pdf', [App\Http\Controllers\Api\RaffleController::class, 'downloadPdf']);
+    });
 });

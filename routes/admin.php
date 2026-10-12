@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\ChartController;
 use App\Http\Controllers\Admin\DjPlaylistController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\RaffleController;
 use App\Http\Controllers\Admin\PreOrderController;
 use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\WeightController;
@@ -286,6 +287,22 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::post('/{client}/cart-to-pdv', [ClientController::class, 'exportCartToPdv'])->name('cart-to-pdv');
             Route::patch('/{client}/toggle-dj', [ClientController::class, 'toggleDj'])->name('toggle-dj');
             Route::patch('/{client}/toggle-active', [ClientController::class, 'toggleActive'])->name('toggle-active');
+        });
+
+        // Sorteio (Raffle)
+        Route::prefix('raffle')->name('raffle.')->group(function () {
+            Route::get('/', [RaffleController::class, 'index'])->name('index');
+            Route::get('/create', [RaffleController::class, 'create'])->name('create');
+            Route::post('/', [RaffleController::class, 'store'])->name('store');
+            Route::get('/settings', [RaffleController::class, 'settings'])->name('settings');
+            Route::put('/settings', [RaffleController::class, 'updateSettings'])->name('settings.update');
+            Route::get('/acceptances', [RaffleController::class, 'acceptances'])->name('acceptances');
+            Route::get('/search-clients', [RaffleController::class, 'searchClients'])->name('search-clients');
+            Route::get('/client/{client}', [RaffleController::class, 'clientNumbers'])->name('client');
+            Route::get('/client/{client}/pdf', [RaffleController::class, 'generatePdf'])->name('client.pdf');
+            Route::post('/client/{client}/send-voucher', [RaffleController::class, 'sendVoucher'])->name('client.send-voucher');
+            Route::get('/{raffle}', [RaffleController::class, 'show'])->name('show');
+            Route::post('/{raffle}/cancel', [RaffleController::class, 'cancel'])->name('cancel');
         });
 
         // Pedidos (Orders)
