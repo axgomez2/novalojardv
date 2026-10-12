@@ -302,7 +302,7 @@
                         return;
                     }
                     try {
-                        const response = await fetch(`{{ route('admin.artists.search') }}?q=${encodeURIComponent(this.artistSearch)}`);
+                        const response = await fetch(`{{ route('admin.settings.artists.search') }}?q=${encodeURIComponent(this.artistSearch)}`);
                         const data = await response.json();
                         this.artistResults = data.artists || [];
                     } catch (e) {
