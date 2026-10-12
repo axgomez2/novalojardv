@@ -246,10 +246,11 @@ class CheckoutController extends Controller
         }
 
         // Limpar carrinho do usuário após criar pedido
-        \App\Models\Cart::where('client_user_id', $user->id)->delete();
-        \App\Models\CartItem::whereHas('cart', function ($q) use ($user) {
-            $q->where('client_user_id', $user->id);
-        })->delete();
+        $cart = $user->cart;
+        if ($cart) {
+            $cart->items()->delete();
+            $cart->delete();
+        }
 
         return response()->json([
             'data' => [
