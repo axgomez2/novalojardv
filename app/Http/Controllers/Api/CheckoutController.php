@@ -153,7 +153,7 @@ class CheckoutController extends Controller
             'shipping_service_name' => 'required|string',
             'shipping_cost' => 'required|numeric|min:0',
             'shipping_deadline' => 'required|integer|min:1',
-            'payment_method' => 'required|in:pix,credit_card,checkout_pro',
+            'payment_method' => 'required|in:pix,credit_card,checkout_pro,whatsapp',
             'customer_notes' => 'nullable|string|max:500',
         ]);
 
@@ -243,6 +243,18 @@ class CheckoutController extends Controller
         if (isset($paymentResult['error'])) {
             $order->delete();
             return response()->json(['error' => $paymentResult['error']], 500);
+        }
+
+        // Registro inicial para Checkout Pro / WhatsApp: identifica a forma de pagamento
+        // (o pagamento real do Checkout Pro é registrado depois via webhook/sync)
+        if (in_array($validated['payment_method'], ['checkout_pro', 'whatsapp'])) {
+            $order->payments()->create([
+                'payment_method' => $validated['payment_method'],
+                'mercado_pago_id' => $paymentResult['preference_id'] ?? null,
+                'mercado_pago_status' => $validated['payment_method'] === 'whatsapp' ? 'pending' : 'preference',
+                'amount' => $order->total,
+                'payment_response' => $paymentResult,
+            ]);
         }
 
         // Limpar carrinho do usuário após criar pedido
@@ -373,10 +385,22 @@ class CheckoutController extends Controller
                 'zip_code' => $order->shippingAddress->zip_code,
             ] : $order->shipping_address_data;
 
-            $data['payment'] = $order->payments->first() ? [
-                'method' => $order->payments->first()->payment_method,
-                'status' => $order->payments->first()->mercado_pago_status,
-                'status_label' => $order->payments->first()->status_label,
+            $lastPayment = $order->payments->sortByDesc('id')->first();
+            $isPending = $order->status === 'pending';
+            $pixPayment = $order->payments->where('payment_method', 'pix')->sortByDesc('id')->first();
+            $proPayment = $order->payments->where('payment_method', 'checkout_pro')->whereNotNull('payment_response')->sortByDesc('id')->first();
+
+            $data['payment'] = $lastPayment ? [
+                'method' => $lastPayment->payment_method,
+                'status' => $lastPayment->mercado_pago_status,
+                'status_detail' => $lastPayment->mercado_pago_status_detail,
+                'status_label' => $lastPayment->status_label,
+                'pix_expiration' => $pixPayment?->pix_expiration?->toISOString(),
+                'pix_expired' => $pixPayment?->pix_expiration?->isPast() ?? false,
+                // Link do Checkout Pro para retomar o pagamento enquanto a preferência é válida
+                'checkout_url' => $isPending && $proPayment && $order->created_at->gt(now()->subHours(MercadoPagoService::CHECKOUT_PRO_EXPIRATION_HOURS))
+                    ? ($proPayment->payment_response['init_point'] ?? null)
+                    : null,
             ] : null;
 
             $data['customer_notes'] = $order->customer_notes;
@@ -404,8 +428,7 @@ class CheckoutController extends Controller
      */
     public function checkPaymentStatus(Request $request, string $orderNumber): JsonResponse
     {
-        $order = ClientOrder::with('payments')
-            ->where('order_number', $orderNumber)
+        $order = ClientOrder::where('order_number', $orderNumber)
             ->where('client_user_id', $request->user()->id)
             ->first();
 
@@ -413,34 +436,61 @@ class CheckoutController extends Controller
             return response()->json(['error' => 'Pedido não encontrado'], 404);
         }
 
-        $payment = $order->payments->first();
-
-        if (!$payment) {
-            return response()->json(['error' => 'Pagamento não encontrado'], 404);
+        // Só consulta o Mercado Pago enquanto o pedido ainda aguarda pagamento.
+        // payment_id vem da query string no retorno do Checkout Pro.
+        if ($order->status === 'pending') {
+            $this->mercadoPago->syncOrderPayment($order, $request->query('payment_id'));
+            $order->refresh();
         }
 
-        // Consultar status atualizado no Mercado Pago
-        $updatedStatus = $this->mercadoPago->checkPaymentStatus($payment->mercado_pago_id);
+        $payment = $order->payments()->latest('id')->first();
 
-        if (isset($updatedStatus['status'])) {
-            $payment->update([
-                'mercado_pago_status' => $updatedStatus['status'],
-                'mercado_pago_status_detail' => $updatedStatus['status_detail'] ?? null,
-            ]);
+        return response()->json([
+            'data' => [
+                'order_number' => $order->order_number,
+                'order_status' => $order->status,
+                'payment_method' => $payment?->payment_method,
+                'payment_status' => $payment?->mercado_pago_status,
+                'payment_status_detail' => $payment?->mercado_pago_status_detail,
+                'is_approved' => $order->is_paid,
+                'is_cancelled' => in_array($order->status, ['cancelled', 'refunded']),
+                'is_rejected' => $payment?->mercado_pago_status === 'rejected',
+            ],
+        ]);
+    }
 
-            // Atualizar status do pedido se aprovado
-            if ($updatedStatus['status'] === 'approved' && $order->status === 'pending') {
-                $order->update(['status' => 'paid']);
-            }
+    /**
+     * Dados do PIX de um pedido pendente (para reabrir a tela de pagamento).
+     */
+    public function getPixPayment(Request $request, string $orderNumber): JsonResponse
+    {
+        $order = ClientOrder::where('order_number', $orderNumber)
+            ->where('client_user_id', $request->user()->id)
+            ->first();
+
+        if (!$order) {
+            return response()->json(['error' => 'Pedido não encontrado'], 404);
+        }
+
+        $payment = $order->payments()->where('payment_method', 'pix')->latest('id')->first();
+
+        if (!$payment) {
+            return response()->json(['error' => 'Este pedido não possui pagamento PIX'], 404);
         }
 
         return response()->json([
             'data' => [
                 'order_number' => $order->order_number,
-                'order_status' => $order->fresh()->status,
-                'payment_status' => $payment->fresh()->mercado_pago_status,
-                'payment_status_detail' => $payment->mercado_pago_status_detail,
-                'is_approved' => $payment->mercado_pago_status === 'approved',
+                'order_status' => $order->status,
+                'is_approved' => $order->is_paid,
+                'total' => $order->total,
+                'formatted_total' => $order->formatted_total,
+                'qr_code' => $order->status === 'pending' ? $payment->pix_qr_code : null,
+                'qr_code_base64' => $order->status === 'pending' ? $payment->pix_qr_code_base64 : null,
+                'expiration' => $payment->pix_expiration?->toISOString(),
+                'is_expired' => $payment->pix_expiration?->isPast() ?? false,
+                'server_time' => now()->toISOString(),
+                'is_sandbox' => (bool) config('services.mercado_pago.sandbox', false),
             ],
         ]);
     }
@@ -471,31 +521,7 @@ class CheckoutController extends Controller
         }
 
         // Simular aprovação
-        $payment->update([
-            'mercado_pago_status' => 'approved',
-            'mercado_pago_status_detail' => 'accredited',
-            'paid_at' => now(),
-        ]);
-
-        $order->update(['status' => 'paid']);
-
-        // Baixar estoque dos itens
-        foreach ($order->items as $item) {
-            if ($item->vinylStock) {
-                $item->vinylStock->decrement('stock', $item->quantity);
-            }
-        }
-
-        // Enviar email de confirmação
-        try {
-            \Illuminate\Support\Facades\Mail::to($order->clientUser->email)
-                ->send(new \App\Mail\OrderConfirmation($order));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Erro ao enviar email de confirmação', [
-                'order' => $order->order_number,
-                'error' => $e->getMessage()
-            ]);
-        }
+        $this->mercadoPago->applyPaymentStatus($order, (string) $payment->mercado_pago_id, 'approved', 'accredited');
 
         return response()->json([
             'data' => [

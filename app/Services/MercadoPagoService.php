@@ -12,6 +12,9 @@ use MercadoPago\MercadoPagoConfig;
 
 class MercadoPagoService
 {
+    public const PIX_EXPIRATION_MINUTES = 30;
+    public const CHECKOUT_PRO_EXPIRATION_HOURS = 24;
+
     protected string $baseUrl = 'https://api.mercadopago.com';
     protected ?string $accessToken;
     protected ?string $publicKey;
@@ -145,7 +148,7 @@ class MercadoPagoService
                     'order_number' => $order->order_number,
                 ],
                 'expires'             => true,
-                'expiration_date_to'  => now()->addHours(24)->format('Y-m-d\TH:i:s.vP'),
+                'expiration_date_to'  => now()->addHours(self::CHECKOUT_PRO_EXPIRATION_HOURS)->format('Y-m-d\TH:i:s.vP'),
             ];
 
             // Frete no bloco shipments (não como item)
@@ -371,12 +374,12 @@ class MercadoPagoService
             'order_id' => $order->id,
             'payment_method' => 'pix',
             'mercado_pago_id' => $data['id'] ?? $paymentData['id'] ?? null,
-            'mercado_pago_status' => $data['status'] ?? 'pending',
+            'mercado_pago_status' => $this->normalizeStatus($data['status'] ?? 'pending'),
             'mercado_pago_status_detail' => $data['status_detail'] ?? null,
             'amount' => (float) $order->total,
             'pix_qr_code' => $paymentMethod['qr_code'] ?? null,
             'pix_qr_code_base64' => $paymentMethod['qr_code_base64'] ?? null,
-            'pix_expiration' => now()->addMinutes(30),
+            'pix_expiration' => now()->addMinutes(self::PIX_EXPIRATION_MINUTES),
             'payment_response' => $data,
         ]);
 
@@ -411,6 +414,7 @@ class MercadoPagoService
             ],
             'external_reference' => $order->order_number,
             'notification_url' => config('app.url') . '/api/webhooks/mercadopago',
+            'date_of_expiration' => now()->addMinutes(self::PIX_EXPIRATION_MINUTES)->format('Y-m-d\TH:i:s.vP'),
         ];
 
         $response = Http::withToken($this->accessToken)
@@ -439,7 +443,7 @@ class MercadoPagoService
             'amount' => $data['transaction_amount'],
             'pix_qr_code' => $data['point_of_interaction']['transaction_data']['qr_code'] ?? null,
             'pix_qr_code_base64' => $data['point_of_interaction']['transaction_data']['qr_code_base64'] ?? null,
-            'pix_expiration' => isset($data['date_of_expiration']) ? now()->parse($data['date_of_expiration']) : now()->addMinutes(30),
+            'pix_expiration' => isset($data['date_of_expiration']) ? now()->parse($data['date_of_expiration']) : now()->addMinutes(self::PIX_EXPIRATION_MINUTES),
             'payment_response' => $data,
         ]);
 
@@ -458,98 +462,262 @@ class MercadoPagoService
      */
     public function processWebhook(array $data): bool
     {
-        if (!isset($data['data']['id']) || !isset($data['type'])) {
+        $type = $data['type'] ?? $data['topic'] ?? null;
+        $resourceId = $data['data']['id'] ?? null;
+
+        if (!$resourceId || !$type) {
             return false;
         }
 
-        if ($data['type'] !== 'payment') {
-            return true;
-        }
-
-        $paymentId = $data['data']['id'];
-
         try {
-            $response = Http::withToken($this->accessToken)
-                ->get($this->baseUrl . '/v1/payments/' . $paymentId);
+            // PIX do sandbox é criado pela Orders API → notificação do tipo "order"
+            if ($type === 'order') {
+                $response = Http::withToken($this->accessToken)->get($this->baseUrl . '/v1/orders/' . $resourceId);
+                if ($response->failed()) {
+                    Log::error('Mercado Pago - Erro ao buscar order', ['id' => $resourceId]);
+                    return false;
+                }
+                $orderData = $response->json();
+                $order = ClientOrder::where('order_number', $orderData['external_reference'] ?? '')->first();
+                if (!$order) {
+                    return false;
+                }
+                $this->applyPaymentStatus($order, (string) $resourceId, $orderData['status'] ?? 'pending', $orderData['status_detail'] ?? null, [
+                    'payment_response' => $orderData,
+                ]);
+                return true;
+            }
 
-            if ($response->failed()) {
-                Log::error('Mercado Pago - Erro ao buscar pagamento', ['id' => $paymentId]);
+            if ($type !== 'payment') {
+                return true;
+            }
+
+            $paymentData = $this->fetchPayment((string) $resourceId);
+            if (!$paymentData) {
                 return false;
             }
 
-            $paymentData = $response->json();
             $externalReference = $paymentData['external_reference'] ?? null;
-
             if (!$externalReference) {
                 return false;
             }
 
             // Pré-vendas usam external_reference no formato PREORDER-{id}-{SIGNAL|BALANCE}
             if (str_starts_with($externalReference, 'PREORDER-')) {
-                return $this->handlePreOrderPaymentWebhook($externalReference, $paymentId, $paymentData);
+                return $this->handlePreOrderPaymentWebhook($externalReference, (string) $resourceId, $paymentData);
             }
 
             $order = ClientOrder::where('order_number', $externalReference)->first();
-
             if (!$order) {
                 Log::warning('Mercado Pago - Pedido não encontrado', ['reference' => $externalReference]);
                 return false;
             }
 
-            $payment = OrderPayment::where('mercado_pago_id', $paymentId)->first();
-
-            if ($payment) {
-                $payment->update([
-                    'mercado_pago_status' => $paymentData['status'],
-                    'mercado_pago_status_detail' => $paymentData['status_detail'] ?? null,
-                    'fee' => $paymentData['fee_details'][0]['amount'] ?? 0,
-                    'net_amount' => $paymentData['transaction_details']['net_received_amount'] ?? $paymentData['transaction_amount'],
-                    'paid_at' => $paymentData['status'] === 'approved' ? now() : null,
-                    'payment_response' => $paymentData,
-                ]);
-            } else {
-                OrderPayment::create([
-                    'order_id' => $order->id,
-                    'payment_method' => $paymentData['payment_method_id'] ?? 'unknown',
-                    'mercado_pago_id' => $paymentId,
-                    'mercado_pago_status' => $paymentData['status'],
-                    'mercado_pago_status_detail' => $paymentData['status_detail'] ?? null,
-                    'amount' => $paymentData['transaction_amount'],
-                    'fee' => $paymentData['fee_details'][0]['amount'] ?? 0,
-                    'net_amount' => $paymentData['transaction_details']['net_received_amount'] ?? $paymentData['transaction_amount'],
-                    'installments' => $paymentData['installments'] ?? 1,
-                    'payer_info' => $paymentData['payer'] ?? null,
-                    'paid_at' => $paymentData['status'] === 'approved' ? now() : null,
-                    'payment_response' => $paymentData,
-                ]);
-            }
-
-            if ($paymentData['status'] === 'approved' && $order->status === 'pending') {
-                $order->update(['status' => 'paid']);
-                
-                // Atualizar estoque
-                foreach ($order->items as $item) {
-                    if ($item->vinylStock) {
-                        $item->vinylStock->decrement('stock', $item->quantity);
-                    }
-                }
-                
-                // Enviar email de confirmação
-                try {
-                    \Illuminate\Support\Facades\Mail::to($order->clientUser->email)
-                        ->send(new \App\Mail\OrderConfirmation($order));
-                } catch (\Exception $e) {
-                    Log::error('Erro ao enviar email de confirmação', [
-                        'order' => $order->order_number,
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            }
-
+            $this->applyPaymentData($order, $paymentData);
             return true;
         } catch (\Exception $e) {
             Log::error('Mercado Pago - Erro no webhook', ['error' => $e->getMessage()]);
             return false;
+        }
+    }
+
+    /**
+     * Busca um pagamento na API /v1/payments.
+     */
+    public function fetchPayment(string $paymentId): ?array
+    {
+        $response = Http::withToken($this->accessToken)->get($this->baseUrl . '/v1/payments/' . $paymentId);
+
+        if ($response->failed()) {
+            Log::error('Mercado Pago - Erro ao buscar pagamento', ['id' => $paymentId, 'status' => $response->status()]);
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Busca o pagamento mais recente de um pedido pelo external_reference
+     * (usado no Checkout Pro, onde não há OrderPayment antes do webhook).
+     */
+    public function searchLatestPaymentByReference(string $externalReference): ?array
+    {
+        $response = Http::withToken($this->accessToken)->get($this->baseUrl . '/v1/payments/search', [
+            'external_reference' => $externalReference,
+            'sort' => 'date_created',
+            'criteria' => 'desc',
+            'limit' => 1,
+        ]);
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        return $response->json('results.0');
+    }
+
+    /**
+     * Grava/atualiza um pagamento vindo da API /v1/payments e aplica o status no pedido.
+     */
+    public function applyPaymentData(ClientOrder $order, array $paymentData): OrderPayment
+    {
+        $amount = $paymentData['transaction_amount'] ?? $order->total;
+
+        return $this->applyPaymentStatus($order, (string) $paymentData['id'], $paymentData['status'] ?? 'pending', $paymentData['status_detail'] ?? null, [
+            'payment_method' => ($paymentData['payment_method_id'] ?? null) === 'pix' ? 'pix' : ($paymentData['payment_type_id'] ?? 'checkout_pro'),
+            'amount' => $amount,
+            'fee' => $paymentData['fee_details'][0]['amount'] ?? 0,
+            'net_amount' => $paymentData['transaction_details']['net_received_amount'] ?? $amount,
+            'installments' => $paymentData['installments'] ?? 1,
+            'payer_info' => $paymentData['payer'] ?? null,
+            'payment_response' => $paymentData,
+        ]);
+    }
+
+    /**
+     * Atualiza (ou cria) o OrderPayment e, se aprovado, marca o pedido como pago.
+     * Ponto único usado por webhook, verificação manual e retorno do Checkout Pro.
+     */
+    public function applyPaymentStatus(ClientOrder $order, string $mercadoPagoId, string $rawStatus, ?string $statusDetail = null, array $extra = []): OrderPayment
+    {
+        $status = $this->normalizeStatus($rawStatus);
+
+        $payment = OrderPayment::firstOrNew(['order_id' => $order->id, 'mercado_pago_id' => $mercadoPagoId]);
+        if (!$payment->exists) {
+            $payment->payment_method = $extra['payment_method'] ?? 'checkout_pro';
+            $payment->amount = $extra['amount'] ?? $order->total;
+        }
+
+        $payment->fill(array_merge(
+            array_diff_key($extra, array_flip(['payment_method', 'amount'])),
+            [
+                'mercado_pago_status' => $status,
+                'mercado_pago_status_detail' => $statusDetail,
+                'paid_at' => $status === 'approved' ? ($payment->paid_at ?? now()) : $payment->paid_at,
+            ]
+        ));
+        $payment->save();
+
+        if ($status === 'approved') {
+            $this->markOrderAsPaid($order);
+        }
+
+        return $payment;
+    }
+
+    /**
+     * Converte status da Orders API (sandbox) para o padrão da Payments API.
+     */
+    public function normalizeStatus(string $status): string
+    {
+        return match ($status) {
+            'processed', 'accredited' => 'approved',
+            'action_required', 'created', 'processing', 'waiting_payment' => 'pending',
+            'canceled', 'expired' => 'cancelled',
+            'failed' => 'rejected',
+            default => $status,
+        };
+    }
+
+    /**
+     * Marca o pedido como pago de forma idempotente: baixa estoque e envia
+     * e-mail apenas na primeira vez. Seguro para webhook + polling simultâneos.
+     */
+    public function markOrderAsPaid(ClientOrder $order): bool
+    {
+        $changed = \Illuminate\Support\Facades\DB::transaction(function () use ($order) {
+            $locked = ClientOrder::whereKey($order->id)->lockForUpdate()->first();
+
+            $canPay = $locked->status === 'pending'
+                || ($locked->status === 'cancelled' && $this->wasAutoExpired($locked));
+
+            if (!$canPay) {
+                return false;
+            }
+
+            $fromStatus = $locked->status;
+            $locked->update(['status' => 'paid']);
+
+            foreach ($locked->items()->with('vinylStock')->get() as $item) {
+                $item->vinylStock?->decrement('stock', $item->quantity);
+            }
+
+            \App\Models\OrderStatusHistory::create([
+                'order_id' => $locked->id,
+                'from_status' => $fromStatus,
+                'to_status' => 'paid',
+                'notes' => 'Pagamento confirmado pelo Mercado Pago',
+            ]);
+
+            return true;
+        });
+
+        if ($changed) {
+            $order->refresh();
+            try {
+                if ($email = $order->customer_email) {
+                    \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\OrderConfirmation($order));
+                }
+            } catch (\Exception $e) {
+                Log::error('Erro ao enviar email de confirmação', [
+                    'order' => $order->order_number,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $changed;
+    }
+
+    public const AUTO_EXPIRED_NOTE = 'Cancelado automaticamente: pagamento não realizado no prazo';
+
+    /**
+     * Pedido cancelado pelo job de expiração (não pelo admin) pode ser
+     * reativado se o pagamento chegar atrasado.
+     */
+    protected function wasAutoExpired(ClientOrder $order): bool
+    {
+        $last = $order->statusHistory()->latest('id')->first();
+
+        return $last && $last->to_status === 'cancelled' && $last->notes === self::AUTO_EXPIRED_NOTE;
+    }
+
+    /**
+     * Sincroniza o status do pagamento de um pedido direto com o Mercado Pago.
+     * $paymentId vem da query string do retorno do Checkout Pro (opcional).
+     */
+    public function syncOrderPayment(ClientOrder $order, ?string $paymentId = null): void
+    {
+        if (!$this->accessToken) {
+            return;
+        }
+
+        if ($paymentId) {
+            $data = $this->fetchPayment($paymentId);
+            // Garante que o payment_id informado pertence a este pedido
+            if ($data && ($data['external_reference'] ?? null) === $order->order_number) {
+                $this->applyPaymentData($order, $data);
+            }
+            return;
+        }
+
+        $payment = $order->payments()->latest('id')->first();
+
+        if ($payment?->payment_method === 'whatsapp') {
+            return;
+        }
+
+        if ($payment?->payment_method === 'pix' && $payment->mercado_pago_id) {
+            $result = $this->checkPaymentStatus($payment->mercado_pago_id);
+            if (isset($result['status'])) {
+                $this->applyPaymentStatus($order, $payment->mercado_pago_id, $result['status'], $result['status_detail'] ?? null);
+            }
+            return;
+        }
+
+        // Checkout Pro: procura pelo external_reference
+        if ($data = $this->searchLatestPaymentByReference($order->order_number)) {
+            $this->applyPaymentData($order, $data);
         }
     }
 

@@ -60,7 +60,7 @@ class OrderPayment extends Model
     {
         return match($this->mercado_pago_status) {
             'approved' => 'Aprovado',
-            'pending' => 'Pendente',
+            'pending', 'preference' => 'Pendente',
             'in_process' => 'Em processamento',
             'rejected' => 'Rejeitado',
             'cancelled' => 'Cancelado',

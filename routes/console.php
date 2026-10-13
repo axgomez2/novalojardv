@@ -8,6 +8,11 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Cancela pedidos online cujo PIX / Checkout Pro expirou sem pagamento
+Schedule::command('orders:expire-pending')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 // Notificações diárias de pré-vendas (lembretes, vencidos, chegou)
 Schedule::command('pre-orders:send-reminders')
     ->dailyAt('09:00')

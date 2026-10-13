@@ -733,6 +733,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [App\Http\Controllers\Api\CheckoutController::class, 'listOrders']);
         Route::get('/{orderNumber}', [App\Http\Controllers\Api\CheckoutController::class, 'getOrder']);
         Route::get('/{orderNumber}/payment-status', [App\Http\Controllers\Api\CheckoutController::class, 'checkPaymentStatus']);
+        Route::get('/{orderNumber}/pix', [App\Http\Controllers\Api\CheckoutController::class, 'getPixPayment']);
         Route::post('/{orderNumber}/simulate-payment', [App\Http\Controllers\Api\CheckoutController::class, 'simulatePaymentApproval']);
     });
 
