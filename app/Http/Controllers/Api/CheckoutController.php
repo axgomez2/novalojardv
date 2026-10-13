@@ -362,6 +362,7 @@ class CheckoutController extends Controller
         ];
 
         if ($detailed) {
+            // shipping_address_data já é array via cast do model — não usar json_decode
             $data['shipping_address'] = $order->shippingAddress ? [
                 'street' => $order->shippingAddress->street,
                 'number' => $order->shippingAddress->number,
@@ -370,7 +371,7 @@ class CheckoutController extends Controller
                 'city' => $order->shippingAddress->city,
                 'state' => $order->shippingAddress->state,
                 'zip_code' => $order->shippingAddress->zip_code,
-            ] : json_decode($order->shipping_address_data, true);
+            ] : $order->shipping_address_data;
 
             $data['payment'] = $order->payments->first() ? [
                 'method' => $order->payments->first()->payment_method,
