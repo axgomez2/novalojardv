@@ -115,6 +115,11 @@ class VinylStock extends Model
         return $this->hasMany(PreOrder::class);
     }
 
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(ClientOrderItem::class, 'vinyl_stock_id');
+    }
+
     // Scopes
     public function scopeAvailable($query)
     {

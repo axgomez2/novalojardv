@@ -201,7 +201,7 @@
                         </td>
                     @endforeach
                     @for($i = $chunk->count(); $i < 6; $i++)
-                        <td width="16.66%"></td>
+                        <td width="16.66%">&nbsp;</td>
                     @endfor
                 </tr>
             @endforeach

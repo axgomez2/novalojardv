@@ -527,19 +527,36 @@ class VinylController extends Controller
     {
         $title = $vinyl->full_title;
 
+        // Estoques vinculados a pedidos não podem ser removidos fisicamente
+        // (client_order_items tem FK com ON DELETE RESTRICT) — usamos soft delete
+        // para preservar o histórico de pedidos.
+        $hasSoldStock = $vinyl->stocks()->withTrashed()->whereHas('orderItems')->exists();
+
+        $vinyl->stocks()->withTrashed()->get()->each(function ($stock) {
+            if ($stock->orderItems()->exists()) {
+                $stock->delete();
+            } else {
+                $stock->forceDelete();
+            }
+        });
+
+        if ($hasSoldStock) {
+            $vinyl->delete();
+            $message = "Disco '{$title}' arquivado: possui pedidos vinculados e não pode ser excluído permanentemente.";
+        } else {
+            $vinyl->forceDelete();
+            $message = 'Disco excluído com sucesso!';
+        }
+
         AdminActivityLog::log(
             auth('admin')->user(),
             'delete',
-            "Disco '{$title}' excluído"
+            "Disco '{$title}' " . ($hasSoldStock ? 'arquivado' : 'excluído')
         );
-
-        // Hard delete: remove estoques relacionados e o master
-        $vinyl->stocks()->withTrashed()->forceDelete();
-        $vinyl->forceDelete();
 
         return redirect()
             ->route('admin.vinyls.index')
-            ->with('success', 'Disco excluído com sucesso!');
+            ->with('success', $message);
     }
 
     /**
@@ -553,26 +570,47 @@ class VinylController extends Controller
         ]);
 
         $count = 0;
+        $archivedCount = 0;
         $titles = [];
 
         foreach ($validated['ids'] as $id) {
             $vinyl = VinylMaster::find($id);
             if ($vinyl) {
                 $titles[] = $vinyl->full_title;
-                $vinyl->stocks()->withTrashed()->forceDelete();
-                $vinyl->forceDelete();
-                $count++;
+
+                $hasSoldStock = $vinyl->stocks()->withTrashed()->whereHas('orderItems')->exists();
+
+                $vinyl->stocks()->withTrashed()->get()->each(function ($stock) {
+                    if ($stock->orderItems()->exists()) {
+                        $stock->delete();
+                    } else {
+                        $stock->forceDelete();
+                    }
+                });
+
+                if ($hasSoldStock) {
+                    $vinyl->delete();
+                    $archivedCount++;
+                } else {
+                    $vinyl->forceDelete();
+                    $count++;
+                }
             }
         }
 
         AdminActivityLog::log(
             auth('admin')->user(),
             'delete',
-            "Exclusão em massa: {$count} disco(s) excluídos - " . implode(', ', array_slice($titles, 0, 5)) . (count($titles) > 5 ? '...' : '')
+            "Exclusão em massa: {$count} disco(s) excluídos, {$archivedCount} arquivado(s) - " . implode(', ', array_slice($titles, 0, 5)) . (count($titles) > 5 ? '...' : '')
         );
+
+        $message = "{$count} disco(s) excluído(s) com sucesso!";
+        if ($archivedCount > 0) {
+            $message .= " {$archivedCount} disco(s) foram arquivados (possuem pedidos vinculados).";
+        }
 
         return redirect()
             ->route('admin.vinyls.index')
-            ->with('success', "{$count} disco(s) excluído(s) com sucesso!");
+            ->with('success', $message);
     }
 }
