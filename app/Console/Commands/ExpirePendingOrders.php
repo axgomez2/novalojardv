@@ -74,7 +74,7 @@ class ExpirePendingOrders extends Command
         return match ($payment->payment_method) {
             'pix' => $payment->pix_expiration?->lt(now()->subMinutes($grace)) ?? false,
 
-            // Checkout Pro: preferência vale 24h. Pagamentos reais pendentes
+            // Checkout Pro: preferência vale 2h. Pagamentos reais pendentes
             // (boleto, cartão em análise) não são cancelados aqui.
             'whatsapp' => false,
             default => !in_array($payment->mercado_pago_status, ['pending', 'in_process', 'authorized'])

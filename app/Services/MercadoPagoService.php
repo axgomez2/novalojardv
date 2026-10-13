@@ -13,7 +13,7 @@ use MercadoPago\MercadoPagoConfig;
 class MercadoPagoService
 {
     public const PIX_EXPIRATION_MINUTES = 30;
-    public const CHECKOUT_PRO_EXPIRATION_HOURS = 24;
+    public const CHECKOUT_PRO_EXPIRATION_HOURS = 2;
 
     protected string $baseUrl = 'https://api.mercadopago.com';
     protected ?string $accessToken;
