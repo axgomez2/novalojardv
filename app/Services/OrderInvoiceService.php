@@ -17,16 +17,20 @@ class OrderInvoiceService
     public function __construct()
     {
         $this->senderData = [
-            'name' => config('app.store_name', 'Vinil Store'),
-            'cpf_cnpj' => config('app.store_cnpj', '00.000.000/0001-00'),
-            'address' => config('app.store_address', 'Endereço da Loja'),
+            'name' => config('app.store_name', 'RDV Discos'),
+            'legal_name' => config('app.store_legal_name', 'Silmara Aparecida de Oliveira'),
+            'cpf_cnpj' => config('app.store_cnpj', '61.850.546/0001-26'),
+            'ie' => config('app.store_ie', '154951218114'),
+            'address' => config('app.store_address', 'Rua Montevideu, 174 - Santo André/SP'),
+            'phone' => config('app.store_phone', '(11) 94715-9293'),
+            'email' => config('app.store_email', 'rdvdiscos@gmail.com'),
         ];
     }
 
     /**
-     * Gerar declaração de conteúdo para o pedido
+     * Gerar invoice do pedido
      */
-    public function generateContentDeclaration(ClientOrder $order): OrderInvoice
+    public function generateInvoice(ClientOrder $order): OrderInvoice
     {
         $order->load(['items.vinylStock.vinylMaster', 'clientUser', 'shippingAddress']);
 
@@ -41,11 +45,16 @@ class OrderInvoiceService
             'order_id' => $order->id,
             'type' => 'content_declaration',
             'sender_name' => $this->senderData['name'],
+            'sender_legal_name' => $this->senderData['legal_name'],
             'sender_cpf_cnpj' => $this->senderData['cpf_cnpj'],
+            'sender_ie' => $this->senderData['ie'],
             'sender_address' => $this->senderData['address'],
+            'sender_phone' => $this->senderData['phone'],
+            'sender_email' => $this->senderData['email'],
             'recipient_name' => $recipientData['name'],
             'recipient_cpf_cnpj' => $recipientData['cpf_cnpj'],
             'recipient_address' => $recipientData['address'],
+            'recipient_phone' => $recipientData['phone'],
             'total_value' => $order->subtotal,
             'shipping_value' => $order->shipping_cost,
             'items' => $items,
@@ -75,6 +84,7 @@ class OrderInvoiceService
                 'name' => $order->clientUser->name,
                 'cpf_cnpj' => $order->clientUser->cpf,
                 'address' => $address,
+                'phone' => $order->customer_phone,
             ];
         }
 
@@ -92,6 +102,7 @@ class OrderInvoiceService
             'name' => $order->guest_name ?? 'Não informado',
             'cpf_cnpj' => $order->guest_cpf,
             'address' => $address,
+            'phone' => $order->guest_phone,
         ];
     }
 
@@ -104,9 +115,13 @@ class OrderInvoiceService
 
         foreach ($order->items as $item) {
             $vinyl = $item->vinylStock?->vinylMaster;
-            
+            $artist = $vinyl?->artist?->name;
+            $title = $vinyl?->title;
+
+            $description = trim(collect([$artist, $title])->filter()->implode(' - '));
+
             $items[] = [
-                'description' => $vinyl ? "{$vinyl->artist?->name} - {$vinyl->title}" : 'Disco de Vinil',
+                'description' => $description !== '' ? $description : 'Disco de Vinil',
                 'quantity' => $item->quantity,
                 'unit_value' => (float) $item->unit_price,
                 'total_value' => (float) $item->total_price,
@@ -117,7 +132,7 @@ class OrderInvoiceService
     }
 
     /**
-     * Gerar PDF da declaração
+     * Gerar PDF da invoice
      */
     protected function generatePdf(OrderInvoice $invoice, ClientOrder $order): string
     {
@@ -127,7 +142,7 @@ class OrderInvoiceService
             'generatedAt' => now()->format('d/m/Y H:i'),
         ];
 
-        $pdf = Pdf::loadView('pdf.content-declaration', $data);
+        $pdf = Pdf::loadView('pdf.invoice', $data);
         $pdf->setPaper('A4', 'portrait');
 
         $filename = "invoices/{$invoice->invoice_number}.pdf";

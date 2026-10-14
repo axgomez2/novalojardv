@@ -378,28 +378,28 @@ class OrderController extends Controller
     }
 
     /**
-     * Gerar declaração de conteúdo
+     * Gerar invoice do pedido
      */
     public function generateInvoice(ClientOrder $order)
     {
         try {
-            $invoice = $this->invoiceService->generateContentDeclaration($order);
+            $invoice = $this->invoiceService->generateInvoice($order);
 
-            return back()->with('success', "Declaração de conteúdo {$invoice->invoice_number} gerada com sucesso!");
+            return back()->with('success', "Invoice {$invoice->invoice_number} gerada com sucesso!");
         } catch (\Exception $e) {
-            return back()->with('error', 'Erro ao gerar declaração: ' . $e->getMessage());
+            return back()->with('error', 'Erro ao gerar invoice: ' . $e->getMessage());
         }
     }
 
     /**
-     * Download da declaração de conteúdo
+     * Download da invoice
      */
     public function downloadInvoice(ClientOrder $order)
     {
         $invoice = $order->invoices()->where('type', 'content_declaration')->latest()->first();
 
         if (!$invoice || !$invoice->pdf_path) {
-            return back()->with('error', 'Declaração não encontrada.');
+            return back()->with('error', 'Invoice não encontrada.');
         }
 
         return response()->download(storage_path('app/public/' . $invoice->pdf_path));

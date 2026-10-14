@@ -353,9 +353,9 @@
                 @endif
             </div>
 
-            <!-- Declaração de Conteúdo -->
+            <!-- Invoice -->
             <div class="rounded-lg bg-white p-6 shadow">
-                <h2 class="mb-4 text-lg font-semibold text-gray-900">Declaração de Conteúdo</h2>
+                <h2 class="mb-4 text-lg font-semibold text-gray-900">Invoice do Pedido</h2>
                 @if($order->invoice_number)
                     <div class="space-y-3">
                         <div>
@@ -374,14 +374,14 @@
                         </a>
                     </div>
                 @else
-                    <p class="mb-4 text-sm text-gray-500">Declaração não gerada.</p>
+                    <p class="mb-4 text-sm text-gray-500">Invoice não gerada.</p>
                     <form method="POST" action="{{ route('admin.orders.generate-invoice', $order) }}">
                         @csrf
                         <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
-                            Gerar Declaração
+                            Gerar Invoice
                         </button>
                     </form>
                 @endif

@@ -12,11 +12,16 @@ class OrderInvoice extends Model
         'invoice_number',
         'type',
         'sender_name',
+        'sender_legal_name',
         'sender_cpf_cnpj',
+        'sender_ie',
         'sender_address',
+        'sender_phone',
+        'sender_email',
         'recipient_name',
         'recipient_cpf_cnpj',
         'recipient_address',
+        'recipient_phone',
         'total_value',
         'shipping_value',
         'items',
@@ -45,7 +50,7 @@ class OrderInvoice extends Model
     public function getTypeLabelAttribute(): string
     {
         return match ($this->type) {
-            'content_declaration' => 'Declaração de Conteúdo',
+            'content_declaration' => 'Invoice',
             'nfe' => 'NF-e',
             default => $this->type,
         };
