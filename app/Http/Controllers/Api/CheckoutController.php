@@ -257,6 +257,14 @@ class CheckoutController extends Controller
             ]);
         }
 
+        // WhatsApp: decrementar estoque imediatamente (reserva)
+        // O pagamento será combinado depois pelo atendimento
+        if ($validated['payment_method'] === 'whatsapp') {
+            foreach ($order->items()->with('vinylStock')->get() as $item) {
+                $item->vinylStock?->decrement('stock', $item->quantity);
+            }
+        }
+
         // Limpar carrinho do usuário após criar pedido
         $cart = $user->cart;
         if ($cart) {
