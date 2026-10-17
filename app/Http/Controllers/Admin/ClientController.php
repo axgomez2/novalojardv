@@ -16,7 +16,10 @@ class ClientController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('alias', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('cpf', 'like', "%{$search}%");
             });
         }
 
@@ -47,6 +50,43 @@ class ClientController extends Controller
         ]);
 
         return view('admin.clients.show', compact('client'));
+    }
+
+    public function edit(ClientUser $client)
+    {
+        return view('admin.clients.edit', compact('client'));
+    }
+
+    public function update(Request $request, ClientUser $client)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'alias' => 'nullable|string|max:100',
+            'email' => 'required|email|max:255|unique:client_users,email,' . $client->id,
+            'phone' => 'nullable|string|max:20',
+            'cpf' => 'nullable|string|max:14',
+            'birth_date' => 'nullable|date',
+            'is_dj' => 'boolean',
+            'is_active' => 'boolean',
+        ]);
+
+        // Normalizar CPF (remover formatação)
+        if (!empty($validated['cpf'])) {
+            $validated['cpf'] = preg_replace('/\D/', '', $validated['cpf']);
+        }
+
+        // Normalizar telefone (remover formatação)
+        if (!empty($validated['phone'])) {
+            $validated['phone'] = preg_replace('/\D/', '', $validated['phone']);
+        }
+
+        $validated['is_dj'] = $request->boolean('is_dj');
+        $validated['is_active'] = $request->boolean('is_active');
+
+        $client->update($validated);
+
+        return redirect()->route('admin.clients.show', $client)
+            ->with('success', 'Cliente atualizado com sucesso!');
     }
 
     public function destroy(ClientUser $client)

@@ -93,7 +93,12 @@
                                     @endif
                                 </div>
                                 <div class="ml-4">
-                                    <div class="text-sm font-medium text-gray-900">{{ $client->name }}</div>
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ $client->name }}
+                                        @if($client->alias)
+                                            <span class="ml-1 text-xs text-indigo-600">({{ $client->alias }})</span>
+                                        @endif
+                                    </div>
                                     <div class="text-sm text-gray-500">{{ $client->email }}</div>
                                 </div>
                             </div>

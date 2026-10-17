@@ -18,6 +18,7 @@ class ClientUser extends Authenticatable
 
     protected $fillable = [
         'name',
+        'alias',
         'email',
         'password',
         'google_id',

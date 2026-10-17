@@ -283,6 +283,8 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::get('/', [ClientController::class, 'index'])->name('index');
             Route::get('/ajax/search-djs', [ClientController::class, 'searchDjs'])->name('search-djs');
             Route::get('/{client}', [ClientController::class, 'show'])->name('show');
+            Route::get('/{client}/edit', [ClientController::class, 'edit'])->name('edit');
+            Route::put('/{client}', [ClientController::class, 'update'])->name('update');
             Route::delete('/{client}', [ClientController::class, 'destroy'])->name('destroy');
             Route::post('/{client}/cart-to-pdv', [ClientController::class, 'exportCartToPdv'])->name('cart-to-pdv');
             Route::patch('/{client}/toggle-dj', [ClientController::class, 'toggleDj'])->name('toggle-dj');
