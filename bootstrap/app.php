@@ -31,10 +31,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Configurar redirect dinâmico baseado na rota
         $middleware->redirectGuestsTo(function ($request) {
-            // API: não redirecionar, deixar o Sanctum retornar 401 JSON
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return null;
-            }
             // Se está acessando área admin, redireciona para login admin
             if ($request->is('admin/*') || $request->is('admin')) {
                 return '/admin/login';
@@ -45,5 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo('/admin');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // API: retornar JSON 401 em vez de redirecionar
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+        });
     })->create();
