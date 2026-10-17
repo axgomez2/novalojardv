@@ -93,12 +93,34 @@
     </div>
 
     <!-- Lista de Pedidos -->
+    <form id="bulk-form" method="POST" action="{{ route('admin.orders.bulk-destroy') }}">
+        @csrf
+        
+        <!-- Ações em massa -->
+        <div id="bulk-actions" class="mb-4 hidden rounded-lg bg-red-50 p-4 border border-red-200">
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-red-800">
+                    <strong id="selected-count">0</strong> pedido(s) selecionado(s)
+                </span>
+                <button type="submit" onclick="return confirm('Tem certeza que deseja excluir os pedidos selecionados? Esta ação não pode ser desfeita.')"
+                        class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Excluir Selecionados
+                </button>
+            </div>
+        </div>
+
     <div class="rounded-lg bg-white shadow">
         @if($orders->count() > 0)
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
+                            <th class="px-4 py-3 text-left">
+                                <input type="checkbox" id="select-all" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            </th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Pedido</th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Cliente</th>
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Itens</th>
@@ -112,6 +134,9 @@
                     <tbody class="divide-y divide-gray-200 bg-white">
                         @foreach($orders as $order)
                             <tr class="hover:bg-gray-50">
+                                <td class="whitespace-nowrap px-4 py-4">
+                                    <input type="checkbox" name="order_ids[]" value="{{ $order->id }}" class="order-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                </td>
                                 <td class="whitespace-nowrap px-6 py-4">
                                     <a href="{{ route('admin.orders.show', $order) }}" class="font-medium text-indigo-600 hover:text-indigo-900">
                                         #{{ $order->order_number }}
@@ -177,4 +202,29 @@
             </div>
         @endif
     </div>
+    </form>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectAll = document.getElementById('select-all');
+            const checkboxes = document.querySelectorAll('.order-checkbox');
+            const bulkActions = document.getElementById('bulk-actions');
+            const selectedCount = document.getElementById('selected-count');
+
+            function updateBulkActions() {
+                const checked = document.querySelectorAll('.order-checkbox:checked').length;
+                selectedCount.textContent = checked;
+                bulkActions.classList.toggle('hidden', checked === 0);
+            }
+
+            selectAll?.addEventListener('change', function() {
+                checkboxes.forEach(cb => cb.checked = this.checked);
+                updateBulkActions();
+            });
+
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', updateBulkActions);
+            });
+        });
+    </script>
 </x-admin-layout>

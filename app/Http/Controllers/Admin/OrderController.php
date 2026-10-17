@@ -526,4 +526,88 @@ class OrderController extends Controller
             return back()->with('error', 'Erro ao reenviar notificação: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Excluir pedido
+     */
+    public function destroy(ClientOrder $order)
+    {
+        DB::beginTransaction();
+
+        try {
+            // Se o pedido foi pago, restaurar estoque
+            if (in_array($order->status, ['paid', 'processing', 'shipped', 'delivered'])) {
+                foreach ($order->items as $item) {
+                    if ($item->vinylStock) {
+                        $item->vinylStock->increment('stock', $item->quantity);
+                    }
+                }
+            }
+
+            // Excluir registros relacionados
+            $order->payments()->delete();
+            $order->statusHistory()->delete();
+            $order->invoices()->delete();
+            $order->items()->delete();
+            
+            // Excluir o pedido
+            $order->delete();
+
+            DB::commit();
+
+            return redirect()->route('admin.orders.index')
+                ->with('success', "Pedido #{$order->order_number} excluído com sucesso!");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Erro ao excluir pedido: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Excluir múltiplos pedidos
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'order_ids' => 'required|array',
+            'order_ids.*' => 'exists:client_orders,id',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $count = 0;
+            foreach ($validated['order_ids'] as $orderId) {
+                $order = ClientOrder::find($orderId);
+                if (!$order) continue;
+
+                // Se o pedido foi pago, restaurar estoque
+                if (in_array($order->status, ['paid', 'processing', 'shipped', 'delivered'])) {
+                    foreach ($order->items as $item) {
+                        if ($item->vinylStock) {
+                            $item->vinylStock->increment('stock', $item->quantity);
+                        }
+                    }
+                }
+
+                // Excluir registros relacionados
+                $order->payments()->delete();
+                $order->statusHistory()->delete();
+                $order->invoices()->delete();
+                $order->items()->delete();
+                $order->delete();
+                $count++;
+            }
+
+            DB::commit();
+
+            return redirect()->route('admin.orders.index')
+                ->with('success', "{$count} pedido(s) excluído(s) com sucesso!");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Erro ao excluir pedidos: ' . $e->getMessage());
+        }
+    }
 }

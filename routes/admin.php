@@ -317,6 +317,8 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
             Route::post('/{order}/note', [OrderController::class, 'addNote'])->name('add-note');
             Route::post('/{order}/resend-notification', [OrderController::class, 'resendNotification'])->name('resend-notification');
             Route::post('/{order}/clear-client-cart', [OrderController::class, 'clearClientCart'])->name('clear-client-cart');
+            Route::delete('/{order}', [OrderController::class, 'destroy'])->name('destroy');
+            Route::post('/bulk-destroy', [OrderController::class, 'bulkDestroy'])->name('bulk-destroy');
             
             // AJAX endpoints
             Route::get('/ajax/search-clients', [OrderController::class, 'searchClients'])->name('search-clients');
