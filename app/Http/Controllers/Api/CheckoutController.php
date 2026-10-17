@@ -496,8 +496,8 @@ class CheckoutController extends Controller
                 'qr_code' => $order->status === 'pending' ? $payment->pix_qr_code : null,
                 'qr_code_base64' => $order->status === 'pending' ? $payment->pix_qr_code_base64 : null,
                 'expiration' => $payment->pix_expiration?->toISOString(),
-                'is_expired' => $payment->pix_expiration?->isPast() ?? false,
-                'server_time' => now()->toISOString(),
+                'is_expired' => $payment->pix_expiration ? now('UTC')->greaterThan($payment->pix_expiration) : false,
+                'server_time' => now('UTC')->toISOString(),
                 'is_sandbox' => (bool) config('services.mercado_pago.sandbox', false),
             ],
         ]);
