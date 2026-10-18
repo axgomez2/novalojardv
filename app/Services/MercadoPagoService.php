@@ -379,7 +379,7 @@ class MercadoPagoService
             'amount' => (float) $order->total,
             'pix_qr_code' => $paymentMethod['qr_code'] ?? null,
             'pix_qr_code_base64' => $paymentMethod['qr_code_base64'] ?? null,
-            'pix_expiration' => now('UTC')->addMinutes(self::PIX_EXPIRATION_MINUTES),
+            'pix_expiration' => \Carbon\Carbon::now('UTC')->addMinutes(self::PIX_EXPIRATION_MINUTES),
             'payment_response' => $data,
         ]);
 
@@ -414,7 +414,7 @@ class MercadoPagoService
             ],
             'external_reference' => $order->order_number,
             'notification_url' => config('app.url') . '/api/webhooks/mercadopago',
-            'date_of_expiration' => now('UTC')->addMinutes(self::PIX_EXPIRATION_MINUTES)->format('Y-m-d\TH:i:s.vP'),
+            'date_of_expiration' => \Carbon\Carbon::now('UTC')->addMinutes(self::PIX_EXPIRATION_MINUTES)->format('Y-m-d\TH:i:s.vP'),
         ];
 
         $response = Http::withToken($this->accessToken)
@@ -443,7 +443,7 @@ class MercadoPagoService
             'amount' => $data['transaction_amount'],
             'pix_qr_code' => $data['point_of_interaction']['transaction_data']['qr_code'] ?? null,
             'pix_qr_code_base64' => $data['point_of_interaction']['transaction_data']['qr_code_base64'] ?? null,
-            'pix_expiration' => isset($data['date_of_expiration']) ? \Carbon\Carbon::parse($data['date_of_expiration']) : now('UTC')->addMinutes(self::PIX_EXPIRATION_MINUTES),
+            'pix_expiration' => isset($data['date_of_expiration']) ? \Carbon\Carbon::parse($data['date_of_expiration'])->setTimezone('UTC') : \Carbon\Carbon::now('UTC')->addMinutes(self::PIX_EXPIRATION_MINUTES),
             'payment_response' => $data,
         ]);
 

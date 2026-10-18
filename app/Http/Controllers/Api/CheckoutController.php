@@ -404,7 +404,7 @@ class CheckoutController extends Controller
                 'status_detail' => $lastPayment->mercado_pago_status_detail,
                 'status_label' => $lastPayment->status_label,
                 'pix_expiration' => $pixPayment?->pix_expiration?->toISOString(),
-                'pix_expired' => $pixPayment?->pix_expiration?->isPast() ?? false,
+                'pix_expired' => $pixPayment?->pix_expiration ? \Carbon\Carbon::now('UTC')->greaterThan($pixPayment->pix_expiration) : false,
                 // Link do Checkout Pro para retomar o pagamento enquanto a preferência é válida
                 'checkout_url' => $isPending && $proPayment && $order->created_at->gt(now()->subHours(MercadoPagoService::CHECKOUT_PRO_EXPIRATION_HOURS))
                     ? ($proPayment->payment_response['init_point'] ?? null)
@@ -496,8 +496,8 @@ class CheckoutController extends Controller
                 'qr_code' => $order->status === 'pending' ? $payment->pix_qr_code : null,
                 'qr_code_base64' => $order->status === 'pending' ? $payment->pix_qr_code_base64 : null,
                 'expiration' => $payment->pix_expiration?->toISOString(),
-                'is_expired' => $payment->pix_expiration ? now('UTC')->greaterThan($payment->pix_expiration) : false,
-                'server_time' => now('UTC')->toISOString(),
+                'is_expired' => $payment->pix_expiration ? \Carbon\Carbon::now('UTC')->greaterThan($payment->pix_expiration) : false,
+                'server_time' => \Carbon\Carbon::now('UTC')->toISOString(),
                 'is_sandbox' => (bool) config('services.mercado_pago.sandbox', false),
             ],
         ]);
