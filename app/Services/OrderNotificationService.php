@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Mail\OrderConfirmation;
+use App\Mail\OrderShipped;
+use App\Mail\OrderDelivered;
 use App\Models\ClientOrder;
 use App\Models\OrderNotification;
 use Illuminate\Support\Facades\Log;
@@ -41,7 +44,7 @@ class OrderNotificationService
      */
     public function notifyOrderShipped(ClientOrder $order): void
     {
-        $this->sendEmailNotification($order, 'order_shipped', 'Pedido Enviado');
+        $this->sendShippedEmail($order);
         $this->sendWhatsAppNotification($order, 'order_shipped');
     }
 
@@ -50,7 +53,7 @@ class OrderNotificationService
      */
     public function notifyOrderDelivered(ClientOrder $order): void
     {
-        $this->sendEmailNotification($order, 'order_delivered', 'Pedido Entregue');
+        $this->sendDeliveredEmail($order);
         $this->sendWhatsAppNotification($order, 'order_delivered');
     }
 
@@ -73,7 +76,87 @@ class OrderNotificationService
     }
 
     /**
-     * Enviar notificação por e-mail
+     * Enviar email de pedido enviado
+     */
+    protected function sendShippedEmail(ClientOrder $order): void
+    {
+        $email = $order->customer_email;
+        
+        if (!$email) {
+            return;
+        }
+
+        $notification = OrderNotification::create([
+            'order_id' => $order->id,
+            'channel' => 'email',
+            'type' => 'order_shipped',
+            'recipient' => $email,
+            'subject' => "[Pedido #{$order->order_number}] Pedido Enviado",
+            'content' => $this->getEmailContent($order, 'order_shipped'),
+            'status' => 'pending',
+        ]);
+
+        try {
+            Mail::to($email)->send(new OrderShipped($order));
+            
+            $notification->markAsSent();
+            
+            Log::info("Order shipped email sent", [
+                'order_id' => $order->id,
+                'recipient' => $email,
+            ]);
+        } catch (\Exception $e) {
+            $notification->markAsFailed($e->getMessage());
+            
+            Log::error("Failed to send order shipped email", [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Enviar email de pedido entregue
+     */
+    protected function sendDeliveredEmail(ClientOrder $order): void
+    {
+        $email = $order->customer_email;
+        
+        if (!$email) {
+            return;
+        }
+
+        $notification = OrderNotification::create([
+            'order_id' => $order->id,
+            'channel' => 'email',
+            'type' => 'order_delivered',
+            'recipient' => $email,
+            'subject' => "[Pedido #{$order->order_number}] Pedido Entregue",
+            'content' => $this->getEmailContent($order, 'order_delivered'),
+            'status' => 'pending',
+        ]);
+
+        try {
+            Mail::to($email)->send(new OrderDelivered($order));
+            
+            $notification->markAsSent();
+            
+            Log::info("Order delivered email sent", [
+                'order_id' => $order->id,
+                'recipient' => $email,
+            ]);
+        } catch (\Exception $e) {
+            $notification->markAsFailed($e->getMessage());
+            
+            Log::error("Failed to send order delivered email", [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Enviar notificação por e-mail (genérico)
      */
     protected function sendEmailNotification(ClientOrder $order, string $type, string $subject): void
     {
@@ -94,8 +177,15 @@ class OrderNotificationService
         ]);
 
         try {
-            // TODO: Implementar envio real de e-mail
-            // Mail::to($email)->send(new OrderNotificationMail($order, $type));
+            // Para tipos específicos, usar Mailables dedicados
+            $mailable = match ($type) {
+                'order_created', 'payment_confirmed' => new OrderConfirmation($order),
+                default => null,
+            };
+
+            if ($mailable) {
+                Mail::to($email)->send($mailable);
+            }
             
             $notification->markAsSent();
             
