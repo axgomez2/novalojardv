@@ -754,3 +754,45 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/download-pdf', [App\Http\Controllers\Api\RaffleController::class, 'downloadPdf']);
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Sitemap Routes (públicas, para SEO)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('sitemap')->group(function () {
+    // Produtos para sitemap
+    Route::get('/products', function () {
+        $products = \App\Models\VinylStock::with(['vinylMaster.mainArtists', 'vinylMaster.vinylImages'])
+            ->where('visibility', 'public')
+            ->whereIn('availability', ['available', 'featured', 'preorder'])
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->map(function ($stock) {
+                $vinyl = $stock->vinylMaster;
+                $artist = $vinyl->mainArtists->first();
+                $image = $vinyl->vinylImages->first();
+                
+                return [
+                    'slug' => $vinyl->slug,
+                    'artist_slug' => $artist?->slug ?? 'artista',
+                    'title' => $vinyl->title,
+                    'artist' => $vinyl->artist_names,
+                    'url' => '/disco/' . ($artist?->slug ?? 'artista') . '/' . $vinyl->slug,
+                    'image' => $image ? asset('storage/' . $image->path) : null,
+                    'updated_at' => $stock->updated_at?->toISOString(),
+                ];
+            });
+        
+        return response()->json(['data' => $products]);
+    });
+
+    // Labels/Gravadoras para sitemap
+    Route::get('/labels', function () {
+        $labels = \App\Models\RecordLabel::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'updated_at']);
+        
+        return response()->json(['data' => $labels]);
+    });
+});
